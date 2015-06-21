@@ -6,14 +6,6 @@ General algo:
 
     GRAPH PHASE:
 
-    scatter vertices
-    given starting vert u and group p
-    pick start vertex u
-        spread to b nearest, unassigned vertices, assign as group p
-            must be planar-accessible
-        create random, planar edges to ensure all phase1 verts are connected
-        choose one vertex from group p (or any previous phases, bias towards last group) as the "gate"
-        recurse with gate as u
 
 key vars:
     b is how large each group is. could be a function of group #
@@ -28,3 +20,13 @@ FILL PHASE:
             try to fill with rectangles
 
         each group, choose a color scheme (using gamut method)
+
+    scatter vertices
+    given starting vert u and group p
+    pick start vertex u
+        spread to b nearest, unassigned vertices, assign as group p
+            must be planar-accessible
+        create random, planar edges to ensure all phase1 verts are connected
+        choose one vertex from group p (or any previous phases, bias towards last group) as the "gate"
+        recurse with gate as u
+    ^^ this is quite bad. should just cluster instead
