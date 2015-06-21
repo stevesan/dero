@@ -110,7 +110,7 @@ def cluster_verts_test():
     pylab.show()
 
 def spread_test():
-    L = 40
+    L = 20
     G = Grid(L, L, ' ')
 
     # first spread the border a bit, so the level doesn't look squareish
@@ -124,7 +124,51 @@ def spread_test():
 
     seed_spread([border], 0, G, ' ', L*4*2 )
 
-    seed_spread(['1','2','3'], 4, G, ' ', L*L)
+    seedvals = ['+','-','=']
+    seed_spread(seedvals, 4, G, ' ', L*L)
     G.write()
 
-spread_test()
+    adj = value_adjacency(G)
+    for (a,b) in adj:
+        print (a,b), '-->', adj[(a,b)]
+
+    labels = {}
+    for (p,x) in G.piter():
+        if x not in labels:
+            labels[x] = str(x)
+
+    # create graph rep
+    H = nx.Graph()
+    for (a,b) in adj:
+        H.add_edge(a,b)
+
+    pos = nx.spring_layout(H)
+    nx.draw(H, pos)
+    nx.draw_networkx_labels(H, pos, labels, font_size=16)
+    pylab.show()
+
+
+def spread_test_2():
+    L = 20
+    G = Grid(L,L, ' ')
+    G.set_border('b')
+    seed_spread(['b'], 0, G, ' ', L*4*1)
+
+# spawn initial region
+    seed_spread(['.'], 1, G, ' ', L*L/5)
+
+    groups = ['.', '1', '2', '3']
+
+    for ig in range(1, len(groups)):
+        # pick the first door to enter this group
+        group = groups[ig]
+        prevgroups = groups[0:ig]
+        door = pick_random( G.cells_adjacent_to(' ', set(prevgroups)) )[0]
+        # seed and spread
+        G.pset(door, group)
+        seed_spread([group], 0, G, ' ', L*L/5)
+
+    G.write()
+
+
+spread_test_2()

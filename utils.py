@@ -21,6 +21,9 @@ class Int2:
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
+    def __repr__(self):
+        return '%d,%d' % (self.x, self.y)
+
     def yieldtest(self):
         yield 1
         yield 2
@@ -89,6 +92,11 @@ class Grid:
             for x in range(self.H):
                 yield (x,y)
 
+    def piter(self):
+        for y in range(self.W):
+            for x in range(self.H):
+                yield (Int2(x,y), self.get(x,y))
+
     def nbors4(self, p):
         for nbor in p.yield_4nbors():
             if self.check(nbor):
@@ -98,6 +106,34 @@ class Grid:
         for nbor in p.yield_4nbors_rand():
             if self.check(nbor):
                 yield (nbor, self.pget(nbor))
+
+    def cells_adjacent_to(self, freeval, valueset):
+        rv = []
+        for (p,a) in self.piter():
+            if a != freeval: continue
+            if a in valueset: continue
+            for (q,b) in self.nbors4(p):
+                if b in valueset:
+                    rv += [ (p,q) ]
+        return rv
+
+    def set_border(self, val):
+        H = self.H
+        W = self.W
+        G = self
+        for y in range(H):
+            G.set(0, y, val)
+            G.set(W-1, y, val)
+        for x in range(W):
+            G.set(x, 0, val)
+            G.set(x, H-1, val)
+
+    def cells_with_values(self, valueset):
+        rv = []
+        for (p,x) in self.piter():
+            if x in valueset:
+                rv += [p]
+        return rv
 
 def vec2_dist(a,b): return (a-b).length
                     
@@ -202,4 +238,16 @@ def seed_spread(seedvals, sews, G, freecell, maxspreads):
                 spreads += 1
                 break
         freespots.remove(p)
+
+def value_adjacency(G):
+    rv = {}
+
+# TODO randomize iteration order, so we don't bias access points towards origin
+    for (p,a) in G.piter():
+        for (q,b) in G.nbors4(p):
+            if a == b: continue
+            if not (a,b) in rv:
+                rv[(a,b)] = (p,q)
+
+    return rv
 
