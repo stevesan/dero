@@ -1,0 +1,30 @@
+TODO:
+    install DOT
+    find good python graph lib (find connected components, etc.)
+
+General algo:
+
+    GRAPH PHASE:
+
+    scatter vertices
+    given starting vert u and group p
+    pick start vertex u
+        spread to b nearest, unassigned vertices, assign as group p
+            must be planar-accessible
+        create random, planar edges to ensure all phase1 verts are connected
+        choose one vertex from group p (or any previous phases, bias towards last group) as the "gate"
+        recurse with gate as u
+
+key vars:
+    b is how large each group is. could be a function of group #
+
+FILL PHASE:
+
+    rasterize to image, create distance field, with nearest-group # (voronoi diagram)
+    for each group, choose a fill algo.
+        the "cave" algo:
+            walk along borders of a group, randomly jitter in and out of distance field
+        the "base" algo:
+            try to fill with rectangles
+
+        each group, choose a color scheme (using gamut method)
