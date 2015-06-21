@@ -9,12 +9,6 @@ import sys
 from planar import Vec2
 from vec2utils import *
 
-nbor4dx = [1, 0, -1, 0]
-nbor4dy = [0, 1, 0, -1]
-
-nbor8dx = [1, 1, 0, -1, -1, -1, 0, 1]
-nbor8dy = [0, 1, 1, 1, 0, -1, -1, -1]
-
 
 def testBasic():
     g = Grid(80,80,' ')
@@ -23,7 +17,7 @@ def testBasic():
         if random.random() < 0.2:
             g.set(x,y,'X')
 
-    g.printgrid()
+    g.write()
 
 
     """
@@ -63,52 +57,74 @@ def tunnel(g, p, c, numdigs, maxdigs):
         if g.pget(nbor) != c:
             tunnel(g, nbor, c, numdigs, maxdigs)
 
-# g = Grid(40,40,' ')
-# tunnel(g, Int2(0, 0), 'X', 0, 20)
-# g.printgrid()
+def tunnel_test():
+    g = Grid(40,40,' ')
+    tunnel(g, Int2(0, 0), 'X', 0, 20)
+    g.write()
 
-G = nx.Graph()
-NV = 35
-numGroups = 4
-groupSize = NV/numGroups
+def cluster_verts_test():
+    G = nx.Graph()
+    NV = 35
+    numGroups = 4
+    groupSize = NV/numGroups
 
-nodePos = slow_poisson_sampler(0.1, NV)
+    nodePos = slow_poisson_sampler(0.1, NV)
 
-for u in range(len(nodePos)):
-    G.add_node(u)
+    for u in range(len(nodePos)):
+        G.add_node(u)
 
-"""
-for i in range(NV):
-    G.add_node(i)
-    nodePosDict[i] = Vec2(random.random(), random.random())
     """
+    for i in range(NV):
+        G.add_node(i)
+        nodePosDict[i] = Vec2(random.random(), random.random())
+        """
 
 # compute distances
 
-nodeGroup = [-1 for u in range(NV)]
+    nodeGroup = [-1 for u in range(NV)]
 
-"""
-for u in range(NV):
-    if nodeGroup[u] != -1: continue
-    nbors = range(NV)
-    nbors.sort(key=lambda v: D.get(u,v) if nodeGroup[v] == -1 else sys.float_info.max)
-    for i in range(0,groupSize+1):
-        v = nbors[i]
-        if nodeGroup[v] != -1: continue
-        nodeGroup[v] = u
-        print u,v
-        G.add_edge(u,v)
-"""
+    """
+    for u in range(NV):
+        if nodeGroup[u] != -1: continue
+        nbors = range(NV)
+        nbors.sort(key=lambda v: D.get(u,v) if nodeGroup[v] == -1 else sys.float_info.max)
+        for i in range(0,groupSize+1):
+            v = nbors[i]
+            if nodeGroup[v] != -1: continue
+            nodeGroup[v] = u
+            print u,v
+            G.add_edge(u,v)
+    """
 
-tupleArray = [(p.x, p.y) for p in nodePos]
-posMatrix = numpy.matrix(tupleArray)
-print posMatrix
+    tupleArray = [(p.x, p.y) for p in nodePos]
+    posMatrix = numpy.matrix(tupleArray)
+    print posMatrix
 # TODO call whiten here??
-(centroids, distortion) = kmeans(posMatrix, numGroups)
+    (centroids, distortion) = kmeans(posMatrix, numGroups)
 
-centersVecArray = [Vec2(row[0], row[1]) for row in centroids]
+    centersVecArray = [Vec2(row[0], row[1]) for row in centroids]
 
-nodeGroup = assign_nearest_center(nodePos, centersVecArray)
+    nodeGroup = assign_nearest_center(nodePos, centersVecArray)
 
-nx.draw(G, nodePos, node_color=nodeGroup, cmap=pylab.get_cmap('jet'))
-pylab.show()
+    nx.draw(G, nodePos, node_color=nodeGroup, cmap=pylab.get_cmap('jet'))
+    pylab.show()
+
+def spread_test():
+    L = 40
+    G = Grid(L, L, ' ')
+
+    # first spread the border a bit, so the level doesn't look squareish
+    border = '.'
+    for y in range(L):
+        G.set(0, y, border)
+        G.set(L-1, y, border)
+    for x in range(L):
+        G.set(x, 0, border)
+        G.set(x, L-1, border)
+
+    seed_spread([border], 0, G, ' ', L*4*2 )
+
+    seed_spread(['1','2','3'], 4, G, ' ', L*L)
+    G.write()
+
+spread_test()

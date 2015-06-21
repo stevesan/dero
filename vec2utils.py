@@ -1,6 +1,14 @@
 
+import numpy
 import random
 from planar import Vec2
+
+vonNeumannNhoodDX = [1, 0, -1, 0]
+vonNeumannNhoodDY = [0, 1, 0, -1]
+
+nbor8dx = [1, 1, 0, -1, -1, -1, 0, 1]
+nbor8dy = [0, 1, 1, 1, 0, -1, -1, -1]
+
 
 class Int2:
     x = 0
@@ -21,7 +29,13 @@ class Int2:
         """ in ccw order """
         p = self
         for i in range(4):
-            yield Int2(p.x+nbor4dx[i], p.y+nbor4dy[i])
+            yield Int2(p.x+vonNeumannNhoodDX[i], p.y+vonNeumannNhoodDY[i])
+
+    def yield_4nbors_rand(self):
+        """ in random order """
+        p = self
+        for i in numpy.random.permutation(4):
+            yield Int2(p.x+vonNeumannNhoodDX[i], p.y+vonNeumannNhoodDY[i])
 
     def yield_8nbors(self):
         """ in ccw order """
@@ -64,7 +78,7 @@ class Grid:
     def pset(self,p,value):
         self.grid[self.W*p.y+p.x] = value
 
-    def printgrid(self):
+    def write(self):
         for y in range(self.H):
             for x in range(self.W):
                 print self.get(x,y),
@@ -74,6 +88,16 @@ class Grid:
         for y in range(self.W):
             for x in range(self.H):
                 yield (x,y)
+
+    def nbors4(self, p):
+        for nbor in p.yield_4nbors():
+            if self.check(nbor):
+                yield (nbor, self.pget(nbor))
+
+    def nbors4_rand(self, p):
+        for nbor in p.yield_4nbors_rand():
+            if self.check(nbor):
+                yield (nbor, self.pget(nbor))
 
 def vec2_dist(a,b): return (a-b).length
                     
@@ -130,4 +154,52 @@ class InterestCurve:
             rv += (center*0.8) * 1.0 * gaussian(frac-center, 0.075)
         rv += 1.0 * gaussian(frac-0.95, 0.1)
         return rv
+
+def pick_random(l):
+    return l[ random.randint(0, len(l)-1) ]
+
+def seed_spread(seedvals, sews, G, freecell, maxspreads):
+    seedvalset = set()
+    for v in seedvals: seedvalset.add(v)
+
+    freespots = []
+    for (x,y) in G.iter():
+        if G.get(x,y) == freecell:
+            freespots += [Int2(x,y)]
+
+    # initial seedings
+    for sew in range(sews):
+        for i in range(len(seedvals)):
+            u = pick_random(freespots)
+            freespots.remove(u)
+            G.pset(u, seedvals[i])
+
+    # spread iteration
+    spreads = 0
+    while len(freespots) > 0 and spreads < maxspreads:
+        if spreads % 10 == 0:
+            print '%d/%d' % (spreads, maxspreads)
+        # compute front
+        front = []
+        for p in freespots:
+            nextToSpread = False
+            for (q, val) in G.nbors4(p):
+                if val in seedvalset:
+                    nextToSpread = True
+                    break
+            if nextToSpread:
+                front += [p]
+
+        if len(front) <= 0:
+            break
+
+        # spread
+        p = pick_random(front)
+        # which seed would spread here?
+        for (q, val) in G.nbors4_rand(p):
+            if val in seedvalset:
+                G.pset(p, val)
+                spreads += 1
+                break
+        freespots.remove(p)
 
