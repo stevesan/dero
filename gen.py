@@ -7,7 +7,7 @@ import scipy
 from scipy.cluster.vq import kmeans
 import sys
 from planar import Vec2
-from vec2utils import *
+from utils import *
 
 
 def testBasic():
