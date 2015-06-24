@@ -11,7 +11,7 @@ from utils import *
 
 
 def testBasic():
-    g = Grid(80,80,' ')
+    g = Grid2(80,80,' ')
 
     for (x,y) in g.iter():
         if random.random() < 0.2:
@@ -20,7 +20,7 @@ def testBasic():
     g.write()
 
 
-    """
+"""
 curve = InterestCurve()
 ff = range(200)
 ii = range(200)
@@ -58,7 +58,7 @@ def tunnel(g, p, c, numdigs, maxdigs):
             tunnel(g, nbor, c, numdigs, maxdigs)
 
 def tunnel_test():
-    g = Grid(40,40,' ')
+    g = Grid2(40,40,' ')
     tunnel(g, Int2(0, 0), 'X', 0, 20)
     g.write()
 
@@ -110,65 +110,101 @@ def cluster_verts_test():
     pylab.show()
 
 def spread_test():
-    L = 20
-    G = Grid(L, L, ' ')
+    L = 30
+    numRegions = 10
+    G = Grid2(L, L, ' ')
 
     # first spread the border a bit, so the level doesn't look squareish
-    border = '.'
-    for y in range(L):
-        G.set(0, y, border)
-        G.set(L-1, y, border)
-    for x in range(L):
-        G.set(x, 0, border)
-        G.set(x, L-1, border)
+    G.set_border('b')
+    seed_spread(['b'], 0, G, ' ', L*4*1 )
 
-    seed_spread([border], 0, G, ' ', L*4*2 )
-
-    seedvals = ['+','-','=']
-    seed_spread(seedvals, 4, G, ' ', L*L)
+    seedvals = [str(i) for i in range(numRegions)]
+    seed_spread(seedvals, 1, G, ' ', L*L)
+    G.replace('b', ' ')
     G.write()
 
     adj = value_adjacency(G)
-    for (a,b) in adj:
-        print (a,b), '-->', adj[(a,b)]
-
-    labels = {}
-    for (p,x) in G.piter():
-        if x not in labels:
-            labels[x] = str(x)
 
     # create graph rep
     H = nx.Graph()
     for (a,b) in adj:
+        if a == ' ':
+            continue
         H.add_edge(a,b)
+        print (a,b), '-->', adj[(a,b)]
 
     pos = nx.spring_layout(H)
     nx.draw(H, pos)
-    nx.draw_networkx_labels(H, pos, labels, font_size=16)
     pylab.show()
 
+    G.show_image()
 
 def spread_test_2():
-    L = 20
-    G = Grid(L,L, ' ')
+    L = 30
+    G = Grid2(L,L, ' ')
     G.set_border('b')
     seed_spread(['b'], 0, G, ' ', L*4*1)
 
 # spawn initial region
-    seed_spread(['.'], 1, G, ' ', L*L/5)
+    seed_spread(['0'], 1, G, ' ', L*L/6)
 
-    groups = ['.', '1', '2', '3']
+    groups = ['0', '1', '2', '3']
+    doors = []
+    keys = []
 
     for ig in range(1, len(groups)):
+# place the key in the previous group
+        prevgroup = groups[ig-1]
+        keypos = pick_random( G.cells_with_values(set([prevgroup])) )
+        keys += [keypos]
         # pick the first door to enter this group
         group = groups[ig]
         prevgroups = groups[0:ig]
-        door = pick_random( G.cells_adjacent_to(' ', set(prevgroups)) )[0]
+
+        (regions, regionsizes) = G.connected_components_grid(' ')
+        front = G.free_cells_adjacent_to(' ', set(prevgroups))
+
+        regions.write()
+
+# bias by region count
+        bag = []
+        for u in front:
+            region = regions.pget(u)
+            size = regionsizes[region]
+            for i in range(size):
+                bag += [u]
+
+        door = pick_random(bag)
+
+# TODO bias towards larger components
+
+# G.write()
+# DEBUG
+        T = G.duplicate()
+        for p in G.free_cells_adjacent_to(' ', set(prevgroups)):
+            T.pset(p, '=')
+        T.write()
+
+        doors += [door]
         # seed and spread
         G.pset(door, group)
-        seed_spread([group], 0, G, ' ', L*L/5)
+        seed_spread([group], 0, G, ' ', L*L/6)
+
+    # pick exit point
+    exit = pick_random([x for x in G.cells_with_value(groups[-1])])
+    G.pset(exit, 'X')
+
+    G.write()
+    print '----'
+    print G.tally()
+
+    for door in doors:
+        G.pset(door, '=')
+    for key in keys:
+        G.pset(key, 'K')
 
     G.write()
 
+    image = numpy.ndarray(L,L)
 
-spread_test_2()
+spread_test()

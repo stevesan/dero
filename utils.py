@@ -1,5 +1,6 @@
 
 import numpy
+import pylab
 import random
 from planar import Vec2
 
@@ -54,7 +55,7 @@ class Int2:
 
     def astuple(self): return (self.x, self.y)
 
-class Grid:
+class Grid2:
     W = 1
     H = 1
     grid = None
@@ -87,6 +88,28 @@ class Grid:
                 print self.get(x,y),
             print ''
 
+    def unique_values(self):
+        vals = set()
+        for (u,x) in self.piter():
+            if not x in vals:
+                vals.add(x)
+        return vals
+
+    def show_image(self):
+        matrix = numpy.ndarray([self.W,self.H])
+        scalarVal = 0.0
+        val2scalar = {}
+        uniques = self.unique_values()
+        for val in uniques:
+            val2scalar[val] = scalarVal
+            scalarVal += 1.0/len(uniques)
+
+        for (u,x) in self.piter():
+            matrix[u.x, u.y] = val2scalar[x]
+
+        pylab.imshow(matrix)
+        pylab.show()
+
     def iter(self):
         for y in range(self.W):
             for x in range(self.H):
@@ -95,6 +118,11 @@ class Grid:
     def piter(self):
         for y in range(self.W):
             for x in range(self.H):
+                yield (Int2(x,y), self.get(x,y))
+
+    def piter_rand(self):
+        for y in numpy.random.permutation(self.W):
+            for x in numpy.random.permutation(self.H):
                 yield (Int2(x,y), self.get(x,y))
 
     def nbors4(self, p):
@@ -107,14 +135,14 @@ class Grid:
             if self.check(nbor):
                 yield (nbor, self.pget(nbor))
 
-    def cells_adjacent_to(self, freeval, valueset):
+    def free_cells_adjacent_to(self, freeval, valueset):
         rv = []
         for (p,a) in self.piter():
             if a != freeval: continue
-            if a in valueset: continue
             for (q,b) in self.nbors4(p):
                 if b in valueset:
-                    rv += [ (p,q) ]
+                    rv += [p]
+                    break
         return rv
 
     def set_border(self, val):
@@ -134,6 +162,53 @@ class Grid:
             if x in valueset:
                 rv += [p]
         return rv
+
+    def cells_with_value(self, value):
+        for (p,x) in self.piter():
+            if x == value:
+                yield p
+
+    def tally(self):
+        table = {}
+        for (p,x) in self.piter():
+            if not x in table:
+                table[x] = 0
+            table[x] += 1
+        return table
+
+    def duplicate(self):
+        rv = Grid2(self.W, self.H, None)
+        for (p,x) in self.piter():
+            rv.pset(p,x)
+        return rv
+
+    def connected_components_grid(self, valueFilter):
+        C = Grid2(self.W, self.H, -1)
+        def helper(u, cid, value):
+            count = 0
+            if C.pget(u) == -1 and self.pget(u) == value:
+                C.pset(u, cid)
+                count += 1
+                for (v,_) in self.nbors4(u):
+                    count += helper(v, cid, value)
+            return count
+
+        compid = 10
+        compsizes = {}
+        for (u,value) in self.piter():
+            if valueFilter and value != valueFilter:
+                continue
+            size = helper(u, compid, value)
+            if size > 0:
+                compsizes[compid] = size
+                compid += 1
+
+        return (C, compsizes)
+
+    def replace(self,q,new):
+        for (u, value) in self.piter():
+            if value == q:
+                self.pset(u, new)
 
 def vec2_dist(a,b): return (a-b).length
                     
@@ -169,7 +244,7 @@ def slow_poisson_sampler(mindist, numpoints):
 
 def distance_grid(poss):
     N = len(poss)
-    D = Grid(N,N, 0.0)
+    D = Grid2(N,N, 0.0)
     for u in range(N):
         for v in range(N):
             pu = poss[u]
@@ -241,13 +316,16 @@ def seed_spread(seedvals, sews, G, freecell, maxspreads):
 
 def value_adjacency(G):
     rv = {}
-
-# TODO randomize iteration order, so we don't bias access points towards origin
-    for (p,a) in G.piter():
+    # randomize order so we don't bias adjacency locations
+    for (p,a) in G.piter_rand():
         for (q,b) in G.nbors4(p):
             if a == b: continue
-            if not (a,b) in rv:
-                rv[(a,b)] = (p,q)
-
+            # strict order
+            if a > b:
+                if not (b,a) in rv:
+                    rv[(b,a)] = (q,p)
+            else:
+                if not (a,b) in rv:
+                    rv[(a,b)] = (p,q)
     return rv
 

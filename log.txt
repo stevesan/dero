@@ -30,3 +30,11 @@ FILL PHASE:
         choose one vertex from group p (or any previous phases, bias towards last group) as the "gate"
         recurse with gate as u
     ^^ this is quite bad. should just cluster instead
+
+
+
+A B C D E
+
+keys for B,C in A
+keys for D in B, keys for E in C
+
