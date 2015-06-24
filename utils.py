@@ -314,6 +314,8 @@ def seed_spread(seedvals, sews, G, freecell, maxspreads):
                 break
         freespots.remove(p)
 
+    return spreads
+
 def value_adjacency(G):
     rv = {}
     # randomize order so we don't bias adjacency locations

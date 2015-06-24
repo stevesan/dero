@@ -110,13 +110,13 @@ def cluster_verts_test():
     pylab.show()
 
 def spread_test():
-    L = 30
-    numRegions = 10
+    L = 20
+    numRegions = 5
     G = Grid2(L, L, ' ')
 
     # first spread the border a bit, so the level doesn't look squareish
     G.set_border('b')
-    seed_spread(['b'], 0, G, ' ', L*4*1 )
+    seed_spread(['b'], 0, G, ' ', L*4*3/2 )
 
     seedvals = [str(i) for i in range(numRegions)]
     seed_spread(seedvals, 1, G, ' ', L*L)
