@@ -1,16 +1,11 @@
-TODO: find better 2d math lib? euclid is alright. just need line intersection
-
 
 current algo:
 
-    seed spread
-    get conn graph
-    compute MST
+    DONE seed spread
+    DONE get conn graph
+    NEXT: compute MST
     do goal placement (squidi's idea)
     add allowed cycle (split tree into regions, etc.)
 
 
-
-
-
-
+TODO: find better 2d math lib? euclid is alright. just need line intersection

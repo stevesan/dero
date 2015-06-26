@@ -110,34 +110,42 @@ def cluster_verts_test():
     pylab.show()
 
 def spread_test():
-    L = 20
-    numRegions = 5
+    L = 30
+    numRegions = 10
     G = Grid2(L, L, ' ')
 
     # first spread the border a bit, so the level doesn't look squareish
-    G.set_border('b')
-    seed_spread(['b'], 0, G, ' ', L*4*3/2 )
+    # avoid square shape
+    for (u,_) in G.piter_outside_radius(L/2):
+        G.pset(u, 'b')
+    seed_spread(['b'], 0, G, ' ', L*L/4 )
+    G.show_image()
 
     seedvals = [str(i) for i in range(numRegions)]
     seed_spread(seedvals, 1, G, ' ', L*L)
     G.replace('b', ' ')
-    G.write()
+    G.show_image()
 
     adj = value_adjacency(G)
 
+
     # create graph rep
-    H = nx.Graph()
+    C = nx.Graph()
     for (a,b) in adj:
         if a == ' ':
             continue
-        H.add_edge(a,b)
+        C.add_edge(a,b)
         print (a,b), '-->', adj[(a,b)]
 
-    pos = nx.spring_layout(H)
-    nx.draw(H, pos)
+    nodepos = nx.spring_layout(C)
+
+    nx.draw(C, nodepos)
     pylab.show()
 
-    G.show_image()
+    T = nx.minimum_spanning_tree(C)
+    nx.draw(T, nodepos)
+    pylab.show()
+
 
 def spread_test_2():
     L = 30

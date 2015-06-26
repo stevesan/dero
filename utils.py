@@ -107,7 +107,7 @@ class Grid2:
         for (u,x) in self.piter():
             matrix[u.x, u.y] = val2scalar[x]
 
-        pylab.imshow(matrix)
+        pylab.imshow(matrix, interpolation='nearest')
         pylab.show()
 
     def iter(self):
@@ -209,6 +209,15 @@ class Grid2:
         for (u, value) in self.piter():
             if value == q:
                 self.pset(u, new)
+
+    def piter_outside_radius(self, r):
+        cx = self.W/2.0
+        cy = self.H/2.0
+        for (u, value) in self.piter():
+            dx = u.x+0.5 - cx
+            dy = u.y+0.5 - cy
+            if (dx*dx + dy*dy) > r*r:
+                yield (u, value)
 
 def vec2_dist(a,b): return (a-b).length
                     
