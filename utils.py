@@ -25,6 +25,12 @@ class Int2:
     def __repr__(self):
         return '%d,%d' % (self.x, self.y)
 
+    def __add__(u,v):
+        return Int2(u.x+v.x, u.y+v.y)
+
+    def __sub__(u,v):
+        return Int2(u.x-v.x, u.y-v.y)
+
     def yieldtest(self):
         yield 1
         yield 2
@@ -83,7 +89,9 @@ class Grid2:
         self.grid[self.W*p.y+p.x] = value
 
     def write(self):
-        for y in range(self.H):
+        yy = range(self.H)
+        yy.reverse()
+        for y in yy:
             for x in range(self.W):
                 print self.get(x,y),
             print ''
@@ -105,10 +113,9 @@ class Grid2:
             scalarVal += 1.0/len(uniques)
 
         for (u,x) in self.piter():
-            matrix[u.x, u.y] = val2scalar[x]
+            matrix[self.H-u.y-1, u.x] = val2scalar[x]
 
         pylab.imshow(matrix, interpolation='nearest')
-        pylab.show()
 
     def iter(self):
         for y in range(self.W):
@@ -219,6 +226,38 @@ class Grid2:
             if (dx*dx + dy*dy) > r*r:
                 yield (u, value)
 
+    def value_adjacency(G):
+        rv = {}
+        # randomize order so we don't bias adjacency locations
+        for (p,a) in G.piter_rand():
+            for (q,b) in G.nbors4_rand(p):
+                if a == b: continue
+                # strict order
+                if a > b:
+                    if not (b,a) in rv:
+                        rv[(b,a)] = (q,p)
+                else:
+                    if not (a,b) in rv:
+                        rv[(a,b)] = (p,q)
+        return rv
+
+    def compute_centroids(G):
+        value2sum = {}
+        value2count = {}
+        for (u,x) in G.piter():
+            if not x in value2sum:
+                value2sum[x] = Int2(0,0)
+            value2sum[x] = value2sum[x] + u
+
+            if not x in value2count:
+                value2count[x] = 0
+            value2count[x] += value2count[x] + 1
+
+        value2cent = {}
+        for x in value2sum:
+            value2cent[x] = value2sum
+
+
 def vec2_dist(a,b): return (a-b).length
                     
 def assign_nearest_center(points, centers):
@@ -278,6 +317,9 @@ class InterestCurve:
 def pick_random(l):
     return l[ random.randint(0, len(l)-1) ]
 
+def pick_random_from_set(s):
+    return pick_random([x for x in s])
+
 def seed_spread(seedvals, sews, G, freecell, maxspreads):
     seedvalset = set()
     for v in seedvals: seedvalset.add(v)
@@ -325,18 +367,15 @@ def seed_spread(seedvals, sews, G, freecell, maxspreads):
 
     return spreads
 
-def value_adjacency(G):
-    rv = {}
-    # randomize order so we don't bias adjacency locations
-    for (p,a) in G.piter_rand():
-        for (q,b) in G.nbors4(p):
-            if a == b: continue
-            # strict order
-            if a > b:
-                if not (b,a) in rv:
-                    rv[(b,a)] = (q,p)
-            else:
-                if not (a,b) in rv:
-                    rv[(a,b)] = (p,q)
-    return rv
+def subtree_sizes(G, root):
+    sizes = {}
+    def recurse(u):
+        count = 1 # count node itself
+        for e in G.edges([u]):
+            recurse(e[1])
+            count += sizes[e[1]]
+        sizes[u] = count
+
+    recurse(root)
+    return sizes
 
