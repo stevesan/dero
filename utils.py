@@ -3,6 +3,7 @@ import numpy
 import pylab
 import random
 from planar import Vec2
+from Queue import *
 
 vonNeumannNhoodDX = [1, 0, -1, 0]
 vonNeumannNhoodDY = [0, 1, 0, -1]
@@ -10,6 +11,11 @@ vonNeumannNhoodDY = [0, 1, 0, -1]
 nbor8dx = [1, 1, 0, -1, -1, -1, 0, 1]
 nbor8dy = [0, 1, 1, 1, 0, -1, -1, -1]
 
+def char_times(c, x):
+    rv = ''
+    for i in range(x):
+        rv += c
+    return rv
 
 class Int2:
     x = 0
@@ -89,12 +95,20 @@ class Grid2:
         self.grid[self.W*p.y+p.x] = value
 
     def write(self):
+# first compute widest string
+        maxlen = 0
+        for (u,x) in self.piter():
+            maxlen = max( len(str(x)), maxlen )
+
         yy = range(self.H)
         yy.reverse()
         for y in yy:
+            rowstr = ''
             for x in range(self.W):
-                print self.get(x,y),
-            print ''
+                val = self.get(x,y)
+                rowstr += char_times(' ', maxlen-len(str(val))+1)
+                rowstr += str(val)
+            print rowstr
 
     def unique_values(self):
         vals = set()
@@ -251,11 +265,15 @@ class Grid2:
 
             if not x in value2count:
                 value2count[x] = 0
-            value2count[x] += value2count[x] + 1
+            value2count[x] = value2count[x] + 1
 
         value2cent = {}
         for x in value2sum:
-            value2cent[x] = value2sum
+            s = value2sum[x]
+            t = value2count[x]
+            value2cent[x] = (s.x*1.0/t, s.y*1.0/t)
+
+        return value2cent
 
 
 def vec2_dist(a,b): return (a-b).length
@@ -379,3 +397,18 @@ def subtree_sizes(G, root):
     recurse(root)
     return sizes
 
+def find_family_of_size_upto(G, leaf, maxsize, sizes):
+    u = leaf
+    while True:
+        parent = None
+        for e in G.in_edges(u):
+            parent = e[0]
+            break
+
+        if parent == None:
+            return u
+        else:
+            if sizes[parent] > maxsize:
+                return u
+            else:
+                u = parent

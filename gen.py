@@ -109,70 +109,6 @@ def cluster_verts_test():
     nx.draw(G, nodePos, node_color=nodeGroup, cmap=pylab.get_cmap('jet'))
     pylab.show()
 
-def spread_test():
-    L = 20
-    numRegions = L*L/80
-    G = Grid2(L, L, ' ')
-
-    # first spread the border a bit, so the level doesn't look squareish
-    # avoid square shape
-    for (u,_) in G.piter_outside_radius(L/2):
-        G.pset(u, 'b')
-    seed_spread(['b'], 0, G, ' ', L*L/4 )
-
-# pylab.figure()
-# G.show_image()
-
-    seedvals = [str(i) for i in range(numRegions)]
-    seed_spread(seedvals, 1, G, ' ', L*L)
-    G.replace('b', ' ')
-
-    pylab.figure()
-    G.show_image()
-
-    adj = G.value_adjacency()
-
-    # create graph rep
-    C = nx.Graph()
-    regions = set()
-    print 'region adjacencies'
-    for (a,b) in adj:
-        if a == ' ':
-            continue
-        C.add_edge(a,b)
-        regions.add(a)
-        regions.add(b)
-        print (a,b), '-->', adj[(a,b)]
-
-    nodepos = nx.spring_layout(C)
-
-    pylab.figure()
-    nx.draw(C, nodepos)
-
-    MST = nx.minimum_spanning_tree(C)
-    spawnVal = seedvals[0]
-    T = nx.dfs_tree(MST, spawnVal)
-    pylab.figure()
-    nx.draw(T, nodepos)
-
-    print 'subtree sizes'
-    S = subtree_sizes(T, spawnVal)
-    print S
-
-    exitcands = []
-    for u in S:
-        if S[u] == 1:
-            exitcands += [u]
-
-    exitVal = pick_random(exitcands)
-    print 'exitVal = %s' % exitVal
-
-    G.write()
-
-    print T.edges()
-
-    pylab.show()
-
 def spread_test_2():
     L = 30
     G = Grid2(L,L, ' ')
@@ -241,4 +177,75 @@ def spread_test_2():
 
     image = numpy.ndarray(L,L)
 
-spread_test()
+def spread_test(L):
+    numRegions = L*L/80
+    G = Grid2(L, L, ' ')
+
+    # first spread the border a bit, so the level doesn't look squareish
+    # avoid square shape
+    for (u,_) in G.piter_outside_radius(L/2):
+        G.pset(u, 'b')
+    seed_spread(['b'], 0, G, ' ', L*L/4 )
+
+# pylab.figure()
+# G.show_image()
+
+    seedvals = [str(i) for i in range(numRegions)]
+    seed_spread(seedvals, 1, G, ' ', L*L)
+    G.replace('b', ' ')
+
+    pylab.figure()
+    G.show_image()
+
+    adj = G.value_adjacency()
+
+    # create graph rep
+    C = nx.Graph()
+    regions = set()
+    print 'region adjacencies'
+    for (a,b) in adj:
+        if a == ' ':
+            continue
+        C.add_edge(a,b)
+        regions.add(a)
+        regions.add(b)
+        print (a,b), '-->', adj[(a,b)]
+
+    MSTundir = nx.minimum_spanning_tree(C)
+    spawnVal = seedvals[0]
+    MST = nx.dfs_tree(MSTundir, spawnVal)
+    nodepos = G.compute_centroids()
+
+    pylab.figure()
+    nx.draw(C, nodepos)
+
+    pylab.figure()
+    nx.draw(MST, nodepos)
+
+    print 'MST edges:', MST.edges()
+    print 'subtree sizes'
+    S = subtree_sizes(MST, spawnVal)
+    print S
+
+    exitcands = []
+    for u in S:
+        if S[u] == 1:
+            exitcands += [u]
+
+    exitVal = pick_random(exitcands)
+    print 'exitVal = %s' % exitVal
+
+# from exit, go up 
+    lockdoor = find_family_of_size_upto(MST, exitVal, numRegions/3, S)
+    print 'locked door = %s' % lockdoor
+
+    G.write()
+
+    for node in MST.nodes():
+        pylab.annotate(str(node), xy=nodepos[node])
+
+
+    pylab.show()
+
+
+spread_test(20)
