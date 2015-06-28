@@ -28,6 +28,9 @@ class Int2:
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
+    def __hash__(self):
+        return hash((self.x,self.y))
+
     def __repr__(self):
         return '%d,%d' % (self.x, self.y)
 
@@ -338,50 +341,72 @@ def pick_random(l):
 def pick_random_from_set(s):
     return pick_random([x for x in s])
 
-def seed_spread(seedvals, sews, G, freecell, maxspreads):
-    seedvalset = set()
-    for v in seedvals: seedvalset.add(v)
+class FrontManager:
+    grid = None
+    freevalue = None
+    array = []
+    _set = set()
 
-    freespots = []
-    for (x,y) in G.iter():
-        if G.get(x,y) == freecell:
-            freespots += [Int2(x,y)]
+    def __init__(self, grid, freevalue):
+        self.grid = grid
+        self.freevalue = freevalue
+
+    def recompute(self):
+        for (u,x) in self.grid.piter():
+            if x != self.freevalue:
+                continue
+            for (v,y) in self.grid.nbors4(u):
+                if y != self.freevalue:
+                    self.array += [u]
+                    self._set.add(u)
+                    break
+
+    def on_fill(self, u):
+        if u in self._set:
+            self._set.remove(u)
+            self.array.remove(u)
+        for (v,val) in self.grid.nbors4(u):
+            if val == self.freevalue and v not in self._set:
+                self.array += [v]
+                self._set.add(v)
+
+    def sample(self):
+        return pick_random(self.array)
+
+    def size(self):
+        return len(self.array)
+
+def seed_spread(seedvals, sews, G, freevalue, maxspreads):
+    seedvalset = set(seedvals)
+    front = FrontManager(G, freevalue)
+    front.recompute()
 
     # initial seedings
+    freespots = [x for x in G.cells_with_value(freevalue)]
+    random.shuffle(freespots)
+    freeid = 0
     for sew in range(sews):
-        for i in range(len(seedvals)):
-            u = pick_random(freespots)
-            freespots.remove(u)
-            G.pset(u, seedvals[i])
+        for val in seedvals:
+            u = freespots[freeid]
+            freeid += 1
+            G.pset(u, val)
+            front.on_fill(u)
+    G.write()
 
     # spread iteration
     spreads = 0
-    while len(freespots) > 0 and spreads < maxspreads:
-        if spreads % 10 == 0:
-            print '%d/%d' % (spreads, maxspreads)
-        # compute front
-        front = []
-        for p in freespots:
-            nextToSpread = False
-            for (q, val) in G.nbors4(p):
-                if val in seedvalset:
-                    nextToSpread = True
-                    break
-            if nextToSpread:
-                front += [p]
-
-        if len(front) <= 0:
-            break
-
+    while front.size() > 0 and spreads < maxspreads:
+        if spreads % 100 == 0:
+            print '%d' %spreads,
         # spread
-        p = pick_random(front)
-        # which seed would spread here?
-        for (q, val) in G.nbors4_rand(p):
+        u = front.sample()
+        # choose a random region, which nbors this front cell, to spread to it
+        for (v, val) in G.nbors4_rand(u):
             if val in seedvalset:
-                G.pset(p, val)
+                G.pset(u, val)
                 spreads += 1
+                front.on_fill(u)
                 break
-        freespots.remove(p)
 
     return spreads
 
@@ -412,3 +437,4 @@ def find_family_of_size_upto(G, leaf, maxsize, sizes):
                 return u
             else:
                 u = parent
+

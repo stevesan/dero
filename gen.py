@@ -218,20 +218,24 @@ def spread_test(L):
 
     pylab.figure()
     nx.draw(C, nodepos)
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
 
     pylab.figure()
     nx.draw(MST, nodepos)
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
 
     print 'MST edges:', MST.edges()
     print 'subtree sizes'
     S = subtree_sizes(MST, spawnVal)
     print S
 
+    # pick a leaf for exit
     exitcands = []
     for u in S:
         if S[u] == 1:
             exitcands += [u]
-
     exitVal = pick_random(exitcands)
     print 'exitVal = %s' % exitVal
 
@@ -244,8 +248,6 @@ def spread_test(L):
     for node in MST.nodes():
         pylab.annotate(str(node), xy=nodepos[node])
 
-
     pylab.show()
 
-
-spread_test(20)
+spread_test(80)

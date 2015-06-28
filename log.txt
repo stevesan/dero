@@ -1,11 +1,12 @@
 
+NEXT: pre-fill smaller components before initial seedings
+
 current algo:
 
     DONE seed spread
     DONE get conn graph
-    NEXT: compute MST
-    do goal placement (squidi's idea)
+    DONE: compute MST
+    NEXT: do goal placement (squidi's idea)
     add allowed cycle (split tree into regions, etc.)
-
 
 TODO: find better 2d math lib? euclid is alright. just need line intersection
