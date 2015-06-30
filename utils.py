@@ -2,8 +2,10 @@
 import numpy
 import pylab
 import random
+import noise
 from planar import Vec2
 from Queue import *
+import sys
 
 vonNeumannNhoodDX = [1, 0, -1, 0]
 vonNeumannNhoodDY = [0, 1, 0, -1]
@@ -120,6 +122,14 @@ class Grid2:
                 vals.add(x)
         return vals
 
+    def show_image_scalar(self, minval, maxval):
+        matrix = numpy.ndarray([self.W,self.H])
+        for (u,val) in self.piter():
+            matrix[self.H-u.y-1, u.x] = (val-minval)/(maxval-minval)
+
+        pylab.imshow(matrix, interpolation='nearest')
+# pylab.imshow(matrix)
+
     def show_image(self):
         matrix = numpy.ndarray([self.W,self.H])
         scalarVal = 0.0
@@ -133,6 +143,7 @@ class Grid2:
             matrix[self.H-u.y-1, u.x] = val2scalar[x]
 
         pylab.imshow(matrix, interpolation='nearest')
+# pylab.imshow(matrix)
 
     def iter(self):
         for y in range(self.W):
@@ -344,42 +355,55 @@ def pick_random_from_set(s):
 class FrontManager:
     grid = None
     freevalue = None
-    array = []
-    _set = set()
+    frontcells = set()
+    invalues = None
 
-    def __init__(self, grid, freevalue):
+    def __init__(self, grid, freevalue, invalues):
         self.grid = grid
         self.freevalue = freevalue
+        self.invalues = invalues
 
     def recompute(self):
-        for (u,x) in self.grid.piter():
-            if x != self.freevalue:
-                continue
+        self.frontcells = set()
+        for u in self.grid.cells_with_value(self.freevalue):
             for (v,y) in self.grid.nbors4(u):
-                if y != self.freevalue:
-                    self.array += [u]
-                    self._set.add(u)
+                if y in self.invalues:
+                    self.frontcells.add(u)
                     break
 
     def on_fill(self, u):
-        if u in self._set:
-            self._set.remove(u)
-            self.array.remove(u)
+        if self.grid.pget(u) == self.freevalue:
+            print 'ERROR'
+        if not self.grid.pget(u) not in self.freevalue:
+            print 'ERROR'
+
+        if u in self.frontcells:
+            self.frontcells.remove(u)
         for (v,val) in self.grid.nbors4(u):
-            if val == self.freevalue and v not in self._set:
-                self.array += [v]
-                self._set.add(v)
+            if val == self.freevalue and v not in self.frontcells:
+                self.frontcells.add(v)
 
     def sample(self):
-        return pick_random(self.array)
+        return random.sample(self.frontcells, 1)[0]
 
     def size(self):
-        return len(self.array)
+        return len(self.frontcells)
+
+    def check(self):
+        for u in self.frontcells:
+            found = False
+            for (v,y) in self.grid.nbors4(u):
+                if y != self.freevalue:
+                    found = True
+                    break
+            if not found:
+                print 'ERROR: '+u
 
 def seed_spread(seedvals, sews, G, freevalue, maxspreads):
     seedvalset = set(seedvals)
-    front = FrontManager(G, freevalue)
+    front = FrontManager(G, freevalue, seedvalset)
     front.recompute()
+    front.check()
 
     # initial seedings
     freespots = [x for x in G.cells_with_value(freevalue)]
@@ -391,22 +415,33 @@ def seed_spread(seedvals, sews, G, freevalue, maxspreads):
             freeid += 1
             G.pset(u, val)
             front.on_fill(u)
-    G.write()
+    front.check()
 
     # spread iteration
     spreads = 0
     while front.size() > 0 and spreads < maxspreads:
         if spreads % 100 == 0:
-            print '%d' %spreads,
+            print '%d' %spreads
         # spread
         u = front.sample()
         # choose a random region, which nbors this front cell, to spread to it
+        filled = False
         for (v, val) in G.nbors4_rand(u):
             if val in seedvalset:
                 G.pset(u, val)
-                spreads += 1
                 front.on_fill(u)
+                spreads += 1
+                filled = True
                 break
+
+        if not filled:
+            print 'ERROR!'
+            print u
+            for (v,val) in G.nbors4(u):
+                print v, val
+            print front.array
+            G.write()
+            sys.exit(1)
 
     return spreads
 
@@ -438,3 +473,19 @@ def find_family_of_size_upto(G, leaf, maxsize, sizes):
             else:
                 u = parent
 
+
+def yield_dfs(G, root, stopset):
+    if stopset and root in stopset:
+        return
+    yield root
+    for e in G.out_edges(root):
+        v = e[1]
+        for u in yield_dfs(G,v, stopset):
+            yield u
+
+def graph_without_subtree(G, root, subroot):
+    keeps = set()
+    u = root
+    for node in yield_dfs(G, root, set([subroot])):
+        keeps.add(node)
+    return G.subgraph(keeps)

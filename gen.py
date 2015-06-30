@@ -177,20 +177,25 @@ def spread_test_2():
 
     image = numpy.ndarray(L,L)
 
-def spread_test(L):
-    numRegions = L*L/80
+def spread_test(L, numRegions):
+    if not numRegions:
+        numRegions = L*L/100
     G = Grid2(L, L, ' ')
 
     # first spread the border a bit, so the level doesn't look squareish
     # avoid square shape
-    for (u,_) in G.piter_outside_radius(L/2):
+    for (u,_) in G.piter_outside_radius(L/2-1):
         G.pset(u, 'b')
-    seed_spread(['b'], 0, G, ' ', L*L/4 )
+    seed_spread(['b'], 0, G, ' ', L*L/6 )
 
 # pylab.figure()
 # G.show_image()
 
     seedvals = [str(i) for i in range(numRegions)]
+    colors = {}
+    for val in seedvals:
+        colors[val] = 'w'
+
     seed_spread(seedvals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
@@ -222,7 +227,6 @@ def spread_test(L):
     pylab.ylim([0, L])
 
     pylab.figure()
-    nx.draw(MST, nodepos)
     pylab.xlim([0, L])
     pylab.ylim([0, L])
 
@@ -231,6 +235,7 @@ def spread_test(L):
     S = subtree_sizes(MST, spawnVal)
     print S
 
+
     # pick a leaf for exit
     exitcands = []
     for u in S:
@@ -238,16 +243,27 @@ def spread_test(L):
             exitcands += [u]
     exitVal = pick_random(exitcands)
     print 'exitVal = %s' % exitVal
+    colors[spawnVal] = 'b'
+    colors[exitVal] = 'k'
 
 # from exit, go up 
     lockdoor = find_family_of_size_upto(MST, exitVal, numRegions/3, S)
     print 'locked door = %s' % lockdoor
+    colors[lockdoor] = 'r'
 
-    G.write()
+    for u in yield_dfs(MST, lockdoor, None):
+        print u
+
+    nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
 
     for node in MST.nodes():
         pylab.annotate(str(node), xy=nodepos[node])
 
+    subMST = graph_without_subtree( MST, spawnVal, lockdoor )
+
+    pylab.figure()
+    nx.draw( subMST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+
     pylab.show()
 
-spread_test(80)
+spread_test(100, numRegions=30)

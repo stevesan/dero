@@ -1,12 +1,14 @@
 
-NEXT: pre-fill smaller components before initial seedings
+NEXT: write doom wad!! with simple "idea" module
 
 current algo:
 
     DONE seed spread
     DONE get conn graph
     DONE: compute MST
-    NEXT: do goal placement (squidi's idea)
+    do goal placement (squidi's idea)
     add allowed cycle (split tree into regions, etc.)
 
 TODO: find better 2d math lib? euclid is alright. just need line intersection
+
+LATER: pre-fill smaller components before initial seedings
