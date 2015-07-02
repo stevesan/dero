@@ -188,9 +188,6 @@ def spread_test(L, numRegions):
         G.pset(u, 'b')
     seed_spread(['b'], 0, G, ' ', L*L/6 )
 
-# pylab.figure()
-# G.show_image()
-
     seedvals = [str(i) for i in range(numRegions)]
     colors = {}
     for val in seedvals:
@@ -199,8 +196,6 @@ def spread_test(L, numRegions):
     seed_spread(seedvals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
-    pylab.figure()
-    G.show_image()
 
     adj = G.value_adjacency()
 
@@ -225,46 +220,26 @@ def spread_test(L, numRegions):
     MST = nx.dfs_tree(MSTundir, spawn_node)
     nodepos = G.compute_centroids()
 
-    pylab.figure()
-    nx.draw(C, nodepos)
-    pylab.xlim([0, L])
-    pylab.ylim([0, L])
-
-    pylab.figure()
-    pylab.xlim([0, L])
-    pylab.ylim([0, L])
-
-    subtree_sizes = eval_subtree_sizes(MST, spawn_node)
-    leaves = [u for u in subtree_sizes if subtree_sizes[u] == 1]
-
     # pick a leaf for exit
 
-    exit_node = random.choice(leaves)
-    leaves.remove(exit_node)
-
-    print 'exit_node = %s' % exit_node
     colors[spawn_node] = 'b'
-    colors[exit_node] = 'r'
-
-    labels[exit_node] += ' END'
     labels[spawn_node] += ' START'
 
-    def draw_labels(G):
-        for node in G.nodes():
+    def draw_labels(graph):
+        for node in graph.nodes():
             pylab.annotate(labels[node], xy=add2(nodepos[node],(-2, 3)))
 
 # DEFINITION: a gate node means, to get TO IT, requires a key.
 
     gates = []
     keys = []
-    last_gate = exit_node
 
     remaining = MST.copy()
 
     def on_key(k):
         keys.append(k)
         colors[k] = 'y'
-        labels[k] += ' K%d' % len(keys)
+        labels[k] += ' K%d' % (len(keys)-1)
 
     def on_gate(g):
         gates.append(g)
@@ -274,7 +249,7 @@ def spread_test(L, numRegions):
         for u in yield_dfs(MST, g, set()):
             colors[u] = 'r'
 
-    def output_state():
+    def write_state_png():
         pylab.figure()
         nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
         pylab.xlim([0, L])
@@ -282,44 +257,50 @@ def spread_test(L, numRegions):
         draw_labels(MST)
         pylab.savefig('gates%d.png' % len(gates))
 
-    on_gate(exit_node)
+    idealsize = numRegions/3
 
     # KEY/LOCK ALGO
     while True:
-        # place key for previous gate
-        key = random.choice(leaves)
-        leaves.remove(key)
+
+        # find subtree of appropriate size for this zone
+        sizes = eval_subtree_sizes(remaining, spawn_node)
+
+        best = None
+        bestsize = 0
+        for node in sizes:
+            size = sizes[node]
+            if best == None or abs(size-idealsize) < abs(bestsize-idealsize):
+                best = node
+                bestsize = size
+
+        # place gate at root of subtree
+        gate = best
+
+        # place key for previous gate inside subtree
+        # favor the smallest subtree root
+        nodes = [u for u in yield_dfs(remaining, gate, None)]
+        best = None
+        bestsize = 0
+        for node in nodes:
+            size = sizes[node]
+            if best == None or size < bestsize:
+                best = node
+                bestsize = size
+        key = best
+
+        remaining = copy_graph_without_subtree(remaining, spawn_node, gate)
+
         on_key(key)
+        write_state_png()
 
-        output_state()
-
-        if key == spawn_node:
+        # stop if we only have 1 or 0 nodes left (probably just the spawn node)
+        if len(remaining.nodes()) <= 1:
             break
-        if len(remaining.nodes()) < numRegions/4:
-            # stop - close enough to the exit
-            break
-
-        # decide location of gate to guard the key
-        subtree_sizes = eval_subtree_sizes(remaining, spawn_node)
-        gate = find_ancestor_family(remaining, key, numRegions/4, subtree_sizes)
-        print 'gate', gate
-
-        on_gate(gate)
-
-        for u in yield_dfs(remaining, gate, None):
-            if u in leaves:
-                leaves.remove(u)
-
-        remaining = copy_graph_without_subtree( remaining, spawn_node, gate )
-        last_gate = gate
+        else:
+            on_gate(gate)
 
     pylab.figure()
-    nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
-    pylab.xlim([0, L])
-    pylab.ylim([0, L])
-
-    draw_labels(MST)
-
-    pylab.show()
+    G.show_image()
+    pylab.savefig('grid.png')
 
 spread_test(int(sys.argv[1]), int(sys.argv[2]))
