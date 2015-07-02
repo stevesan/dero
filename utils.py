@@ -19,6 +19,9 @@ def char_times(c, x):
         rv += c
     return rv
 
+def add2(a,b):
+    return (a[0]+b[0], a[1]+b[1])
+
 class Int2:
     x = 0
     y = 0
@@ -421,7 +424,7 @@ def seed_spread(seedvals, sews, G, freevalue, maxspreads):
     spreads = 0
     while front.size() > 0 and spreads < maxspreads:
         if spreads % 100 == 0:
-            print '%d' %spreads
+            print '\r %d' %spreads,
         # spread
         u = front.sample()
         # choose a random region, which nbors this front cell, to spread to it
@@ -445,7 +448,7 @@ def seed_spread(seedvals, sews, G, freevalue, maxspreads):
 
     return spreads
 
-def subtree_sizes(G, root):
+def eval_subtree_sizes(G, root):
     sizes = {}
     def recurse(u):
         count = 1 # count node itself
@@ -457,14 +460,10 @@ def subtree_sizes(G, root):
     recurse(root)
     return sizes
 
-def find_family_of_size_upto(G, leaf, maxsize, sizes):
+def find_ancestor_family(G, leaf, maxsize, sizes):
     u = leaf
     while True:
-        parent = None
-        for e in G.in_edges(u):
-            parent = e[0]
-            break
-
+        parent = get_parent(G, u)
         if parent == None:
             return u
         else:
@@ -483,9 +482,15 @@ def yield_dfs(G, root, stopset):
         for u in yield_dfs(G,v, stopset):
             yield u
 
-def graph_without_subtree(G, root, subroot):
+def copy_graph_without_subtree(G, root, subroot):
     keeps = set()
     u = root
     for node in yield_dfs(G, root, set([subroot])):
         keeps.add(node)
     return G.subgraph(keeps)
+
+def get_parent(T, node):
+    for u in T.in_edges(node):
+        return u[0]
+    return None
+

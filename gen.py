@@ -207,18 +207,22 @@ def spread_test(L, numRegions):
     # create graph rep
     C = nx.Graph()
     regions = set()
-    print 'region adjacencies'
+    # print 'region adjacencies'
     for (a,b) in adj:
         if a == ' ':
             continue
         C.add_edge(a,b)
         regions.add(a)
         regions.add(b)
-        print (a,b), '-->', adj[(a,b)]
+        # print (a,b), '-->', adj[(a,b)]
+
+    labels = {}
+    for node in C.nodes():
+        labels[node] = str(node)
 
     MSTundir = nx.minimum_spanning_tree(C)
-    spawnVal = seedvals[0]
-    MST = nx.dfs_tree(MSTundir, spawnVal)
+    spawn_node = seedvals[0]
+    MST = nx.dfs_tree(MSTundir, spawn_node)
     nodepos = G.compute_centroids()
 
     pylab.figure()
@@ -230,40 +234,92 @@ def spread_test(L, numRegions):
     pylab.xlim([0, L])
     pylab.ylim([0, L])
 
-    print 'MST edges:', MST.edges()
-    print 'subtree sizes'
-    S = subtree_sizes(MST, spawnVal)
-    print S
-
+    subtree_sizes = eval_subtree_sizes(MST, spawn_node)
+    leaves = [u for u in subtree_sizes if subtree_sizes[u] == 1]
 
     # pick a leaf for exit
-    exitcands = []
-    for u in S:
-        if S[u] == 1:
-            exitcands += [u]
-    exitVal = pick_random(exitcands)
-    print 'exitVal = %s' % exitVal
-    colors[spawnVal] = 'b'
-    colors[exitVal] = 'k'
 
-# from exit, go up 
-    lockdoor = find_family_of_size_upto(MST, exitVal, numRegions/3, S)
-    print 'locked door = %s' % lockdoor
-    colors[lockdoor] = 'r'
+    exit_node = random.choice(leaves)
+    leaves.remove(exit_node)
 
-    for u in yield_dfs(MST, lockdoor, None):
-        print u
+    print 'exit_node = %s' % exit_node
+    colors[spawn_node] = 'b'
+    colors[exit_node] = 'r'
 
-    nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+    labels[exit_node] += ' END'
+    labels[spawn_node] += ' START'
 
-    for node in MST.nodes():
-        pylab.annotate(str(node), xy=nodepos[node])
+    def draw_labels(G):
+        for node in G.nodes():
+            pylab.annotate(labels[node], xy=add2(nodepos[node],(-2, 3)))
 
-    subMST = graph_without_subtree( MST, spawnVal, lockdoor )
+# DEFINITION: a gate node means, to get TO IT, requires a key.
+
+    gates = []
+    keys = []
+    last_gate = exit_node
+
+    remaining = MST.copy()
+
+    def on_key(k):
+        keys.append(k)
+        colors[k] = 'y'
+        labels[k] += ' K%d' % len(keys)
+
+    def on_gate(g):
+        gates.append(g)
+        colors[g] = 'r'
+        labels[g] += ' G%d' % len(gates)
+
+        for u in yield_dfs(MST, g, set()):
+            colors[u] = 'r'
+
+    def output_state():
+        pylab.figure()
+        nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+        pylab.xlim([0, L])
+        pylab.ylim([0, L])
+        draw_labels(MST)
+        pylab.savefig('gates%d.png' % len(gates))
+
+    on_gate(exit_node)
+
+    # KEY/LOCK ALGO
+    while True:
+        # place key for previous gate
+        key = random.choice(leaves)
+        leaves.remove(key)
+        on_key(key)
+
+        output_state()
+
+        if key == spawn_node:
+            break
+        if len(remaining.nodes()) < numRegions/4:
+            # stop - close enough to the exit
+            break
+
+        # decide location of gate to guard the key
+        subtree_sizes = eval_subtree_sizes(remaining, spawn_node)
+        gate = find_ancestor_family(remaining, key, numRegions/4, subtree_sizes)
+        print 'gate', gate
+
+        on_gate(gate)
+
+        for u in yield_dfs(remaining, gate, None):
+            if u in leaves:
+                leaves.remove(u)
+
+        remaining = copy_graph_without_subtree( remaining, spawn_node, gate )
+        last_gate = gate
 
     pylab.figure()
-    nx.draw( subMST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+    nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
+
+    draw_labels(MST)
 
     pylab.show()
 
-spread_test(100, numRegions=30)
+spread_test(int(sys.argv[1]), int(sys.argv[2]))

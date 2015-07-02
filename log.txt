@@ -1,13 +1,24 @@
 
+NEXT: construct more balanced spanning tree
 NEXT: write doom wad!! with simple "idea" module
+NEXT: need to bias key placement toward small subtrees
 
 current algo:
 
     DONE seed spread
     DONE get conn graph
-    DONE: compute MST
-    do goal placement (squidi's idea)
-    add allowed cycle (split tree into regions, etc.)
+    DONE compute MST
+    DONE do goal placement (squidi's idea)
+
+        given exit pos, nodes per zone, key
+        if key
+            place key in any node, possibly far from exit
+
+        up from exit, find biggest subtree <= nodes per zone
+        make subtree myExit, make it locked.
+        recurse( myExit, maxNodesPerZone, key=key(myExit) )
+
+    add allowed cycles (split tree into regions, etc.)
 
 TODO: find better 2d math lib? euclid is alright. just need line intersection
 
