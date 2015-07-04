@@ -177,6 +177,36 @@ def spread_test_2():
 
     image = numpy.ndarray(L,L)
 
+def key_lock_algo0(tree, spawn_node, ideal_zone_size):
+    remaining = tree
+    while True:
+
+        # find subtree of appropriate size for this zone
+        sizes = eval_subtree_sizes(remaining, spawn_node)
+
+        best = None
+        bestsize = 0
+        for node in sizes:
+            size = sizes[node]
+            if best == None or abs(size-ideal_zone_size) < abs(bestsize-ideal_zone_size):
+                best = node
+                bestsize = size
+
+        # place gate at root of subtree
+        gate = best
+        remaining = copy_graph_without_subtree(remaining, spawn_node, gate)
+
+        if len(remaining.nodes()) <= 1:
+            break
+
+# TODO should choose key pos furthest from previous gate
+# actually, we should do key placement after we do the cycle-restoring.
+# also, we don't need to place the key in this zone, we can place it in any remaining spot
+        key = random.choice(remaining.nodes())
+
+        yield (key, gate)
+
+
 def spread_test(L, numRegions):
     if not numRegions:
         numRegions = L*L/100
@@ -257,43 +287,13 @@ def spread_test(L, numRegions):
         draw_labels(MST)
         pylab.savefig('gates%d.png' % len(gates))
 
-    idealsize = numRegions/3
-
     write_state_png()
 
-    # KEY/LOCK ALGO
-    while True:
-
-        # find subtree of appropriate size for this zone
-        sizes = eval_subtree_sizes(remaining, spawn_node)
-
-        best = None
-        bestsize = 0
-        for node in sizes:
-            size = sizes[node]
-            if best == None or abs(size-idealsize) < abs(bestsize-idealsize):
-                best = node
-                bestsize = size
-
-        # place gate at root of subtree
-        gate = best
-        remaining = copy_graph_without_subtree(remaining, spawn_node, gate)
-
-        if len(remaining.nodes()) <= 1:
-            break
-
-        key = random.choice(remaining.nodes())
-
-# TODO should choose key pos furthest from previous gate
-# actually, we should do key placement after we do the cycle-restoring.
-# also, we don't need to place the key in this zone, we can place it in any remaining spot
+    for (key, gate) in key_lock_algo0(MST, spawn_node, numRegions/3):
+        print key, gate
         on_key(key)
         on_gate(gate)
         write_state_png()
-
-        # stop if we only have 1 or 0 nodes left (probably just the spawn node)
-# if len(remaining.nodes()) <= 1:
-# break
 
     pylab.figure()
     G.show_image()
