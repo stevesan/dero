@@ -264,7 +264,7 @@ def spread_test(L, numRegions):
     def on_key(k):
         keys.append(k)
         colors[k] = 'y'
-        labels[k] += ' K%d' % len(keys)
+        labels[k] += ' K%d' % (len(keys)-1)
 
     def on_gate(g):
         gates.append(g)
@@ -284,8 +284,6 @@ def spread_test(L, numRegions):
 
     on_gate(exit_node)
 
-    write_state_png()
-
     # KEY/LOCK ALGO
     while True:
 
@@ -302,23 +300,29 @@ def spread_test(L, numRegions):
 
         # place gate at root of subtree
         gate = best
+
+        # place key for previous gate inside subtree
+        # favor the smallest subtree root
+        nodes = [u for u in yield_dfs(remaining, gate, None)]
+        best = None
+        bestsize = 0
+        for node in nodes:
+            size = sizes[node]
+            if best == None or size < bestsize:
+                best = node
+                bestsize = size
+        key = best
+
         remaining = copy_graph_without_subtree(remaining, spawn_node, gate)
 
-        if len(remaining.nodes()) <= 1:
-            break
-
-        key = random.choice(remaining.nodes())
-
-# TODO should choose key pos furthest from previous gate
-# actually, we should do key placement after we do the cycle-restoring.
-# also, we don't need to place the key in this zone, we can place it in any remaining spot
         on_key(key)
-        on_gate(gate)
         write_state_png()
 
         # stop if we only have 1 or 0 nodes left (probably just the spawn node)
-# if len(remaining.nodes()) <= 1:
-# break
+        if len(remaining.nodes()) <= 1:
+            break
+        else:
+            on_gate(gate)
 
     pylab.figure()
     nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
