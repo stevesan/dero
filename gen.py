@@ -177,10 +177,9 @@ def spread_test_2():
 
     image = numpy.ndarray(L,L)
 
-def key_lock_algo0(tree, spawn_node, ideal_zone_size):
+def squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
     remaining = tree
-    while True:
-
+    while len(remaining.nodes()) > 1:
         # find subtree of appropriate size for this zone
         sizes = eval_subtree_sizes(remaining, spawn_node)
 
@@ -192,20 +191,16 @@ def key_lock_algo0(tree, spawn_node, ideal_zone_size):
                 best = node
                 bestsize = size
 
-        # place gate at root of subtree
-        gate = best
-        remaining = copy_graph_without_subtree(remaining, spawn_node, gate)
+        # place lock at root of subtree
+        lock = best
+        remaining = copy_graph_without_subtree(remaining, spawn_node, lock)
 
-        if len(remaining.nodes()) <= 1:
-            break
-
-# TODO should choose key pos furthest from previous gate
+# TODO should choose key pos furthest from previous lock
 # actually, we should do key placement after we do the cycle-restoring.
 # also, we don't need to place the key in this zone, we can place it in any remaining spot
         key = random.choice(remaining.nodes())
 
-        yield (key, gate)
-
+        yield (key, lock)
 
 def spread_test(L, numRegions):
     if not numRegions:
@@ -259,7 +254,7 @@ def spread_test(L, numRegions):
         for node in graph.nodes():
             pylab.annotate(labels[node], xy=add2(nodepos[node],(-2, 3)))
 
-# DEFINITION: a gate node means, to get TO IT, requires a key.
+# DEFINITION: a lock node means, to get TO IT, requires a key.
 
     gates = []
     keys = []
@@ -289,14 +284,24 @@ def spread_test(L, numRegions):
 
     write_state_png()
 
-    for (key, gate) in key_lock_algo0(MST, spawn_node, numRegions/3):
-        print key, gate
+    for (key, lock) in squidi_keylock_algo(MST, spawn_node, numRegions/3):
+        print key, lock
         on_key(key)
-        on_gate(gate)
+        on_gate(lock)
         write_state_png()
 
     pylab.figure()
     G.show_image()
     pylab.savefig('grid.png')
 
-spread_test(int(sys.argv[1]), int(sys.argv[2]))
+# spread_test(int(sys.argv[1]), int(sys.argv[2]))
+
+def v_case():
+    T = nx.DiGraph()
+    T.add_edge(1,2)
+    T.add_edge(1,3)
+
+    for (key, lock) in squidi_keylock_algo(T, 1, 1):
+        print key, lock
+
+v_case()
