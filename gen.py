@@ -188,6 +188,9 @@ def spread_test(L, numRegions):
         G.pset(u, 'b')
     seed_spread(['b'], 0, G, ' ', L*L/6 )
 
+# pylab.figure()
+# G.show_image()
+
     seedvals = [str(i) for i in range(numRegions)]
     colors = {}
     for val in seedvals:
@@ -196,6 +199,8 @@ def spread_test(L, numRegions):
     seed_spread(seedvals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
+    pylab.figure()
+    G.show_image()
 
     adj = G.value_adjacency()
 
@@ -220,19 +225,39 @@ def spread_test(L, numRegions):
     MST = nx.dfs_tree(MSTundir, spawn_node)
     nodepos = G.compute_centroids()
 
+    pylab.figure()
+    nx.draw(C, nodepos)
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
+
+    pylab.figure()
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
+
+    subtree_sizes = eval_subtree_sizes(MST, spawn_node)
+    leaves = [u for u in subtree_sizes if subtree_sizes[u] == 1]
+
     # pick a leaf for exit
 
+    exit_node = random.choice(leaves)
+    leaves.remove(exit_node)
+
+    print 'exit_node = %s' % exit_node
     colors[spawn_node] = 'b'
+    colors[exit_node] = 'r'
+
+    labels[exit_node] += ' END'
     labels[spawn_node] += ' START'
 
-    def draw_labels(graph):
-        for node in graph.nodes():
+    def draw_labels(G):
+        for node in G.nodes():
             pylab.annotate(labels[node], xy=add2(nodepos[node],(-2, 3)))
 
 # DEFINITION: a gate node means, to get TO IT, requires a key.
 
     gates = []
     keys = []
+    last_gate = exit_node
 
     remaining = MST.copy()
 
@@ -249,7 +274,7 @@ def spread_test(L, numRegions):
         for u in yield_dfs(MST, g, set()):
             colors[u] = 'r'
 
-    def write_state_png():
+    def output_state():
         pylab.figure()
         nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
         pylab.xlim([0, L])
@@ -257,7 +282,7 @@ def spread_test(L, numRegions):
         draw_labels(MST)
         pylab.savefig('gates%d.png' % len(gates))
 
-    idealsize = numRegions/3
+    on_gate(exit_node)
 
     write_state_png()
 
@@ -296,7 +321,12 @@ def spread_test(L, numRegions):
 # break
 
     pylab.figure()
-    G.show_image()
-    pylab.savefig('grid.png')
+    nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
+
+    draw_labels(MST)
+
+    pylab.show()
 
 spread_test(int(sys.argv[1]), int(sys.argv[2]))
