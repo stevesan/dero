@@ -187,6 +187,7 @@ def squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
         bestsize = 0
         for node in sizes:
             size = sizes[node]
+            if node == spawn_node: continue
             if best == None or abs(size-ideal_zone_size) < abs(bestsize-ideal_zone_size):
                 best = node
                 bestsize = size
@@ -202,7 +203,7 @@ def squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
 
         yield (key, lock)
 
-def spread_test(L, numRegions):
+def method2(L, numRegions):
     if not numRegions:
         numRegions = L*L/100
     G = Grid2(L, L, ' ')
@@ -294,7 +295,6 @@ def spread_test(L, numRegions):
     G.show_image()
     pylab.savefig('grid.png')
 
-# spread_test(int(sys.argv[1]), int(sys.argv[2]))
 
 def v_case():
     T = nx.DiGraph()
@@ -304,4 +304,6 @@ def v_case():
     for (key, lock) in squidi_keylock_algo(T, 1, 1):
         print key, lock
 
-v_case()
+# v_case()
+
+method2(int(sys.argv[1]), int(sys.argv[2]))
