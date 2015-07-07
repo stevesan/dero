@@ -500,3 +500,23 @@ def get_parent(T, node):
         return u[0]
     return None
 
+def pick_max(items, score_func):
+    best = None
+    best_score = 0
+    for item in items:
+        score = score_func(item)
+        if best == None or score > best_score:
+            best = item
+            best_score = score
+    return best
+        
+def pick_min(items, score_func):
+    best = None
+    best_score = 0
+    for item in items:
+        score = score_func(item)
+        if best == None or score < best_score:
+            best = item
+            best_score = score
+    return best
+        

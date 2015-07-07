@@ -203,7 +203,7 @@ def squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
 
         yield (key, lock)
 
-def needy_squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
+def needy_squidi_keylock_algo(tree, spawn_node, exit_node, ideal_zone_size):
 
     needed_nodes = set()
 
@@ -212,45 +212,37 @@ def needy_squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
         for u in yield_ancestors(tree, u):
             needed_nodes.add(u)
 
-    # choose a random leaf to be the exit
-    sizes = eval_subtree_sizes(tree, spawn_node)
-    exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
     mark_needed(exit_node)
-    print 'exit node = ', exit_node
-
     remaining = tree
-    while len(remaining.nodes()) > 1:
+    while len(remaining.nodes()) > ideal_zone_size/2:
         # stop if only the spawn node is left
 
         # find subtree of appropriate size for this zone
         sizes = eval_subtree_sizes(remaining, spawn_node)
 
-        best = None
-        bestsize = 0
-        for node in sizes:
-            # only consider needed nodes
-            if node not in needed_nodes:
-                continue
-            # also don't ever lock the spawn node
-            if node == spawn_node:
-                continue
-            size = sizes[node]
-            if best == None or abs(size-ideal_zone_size) < abs(bestsize-ideal_zone_size):
-                best = node
-                bestsize = size
-
-        if not best:
-            # we couldn't find any eligible, needed nodes. must be done.
+        eligible = [u for u in remaining.nodes() if u in needed_nodes and u != spawn_node]
+        score_func = lambda u : abs(sizes[u]-ideal_zone_size)
+        lock = pick_min( eligible, score_func )
+        if not lock:
             break
-
-        # place lock at root of subtree
-        lock = best
         mark_needed(lock)
 
         # update and pick key location
         remaining = copy_graph_without_subtree(remaining, spawn_node, lock)
-        key = random.choice(remaining.nodes())
-        # the key is also needed now
+
+# choose a location that is furthest from a needed node
+# this should approximately put keys far away from locks
+
+        def eval_dist_to_needed(node):
+            count = 0
+            u = node
+            while u and not u in needed_nodes:
+                count += 1
+                u = get_parent(remaining, u)
+            return count
+
+        score_func = lambda u : eval_dist_to_needed(u)
+        key = pick_max( remaining.nodes(), score_func )
         mark_needed(key)
 
         yield (key, lock)
@@ -299,7 +291,14 @@ def method2(L, numRegions):
     nodepos = G.compute_centroids()
 
     colors[spawn_node] = 'b'
-    labels[spawn_node] += ' START'
+    labels[spawn_node] += ' SP'
+
+    # choose a random leaf to be the exit
+    sizes = eval_subtree_sizes(MST, spawn_node)
+    exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
+    print 'exit node = ', exit_node
+    colors[exit_node] = 'g'
+    labels[exit_node] += ' EX'
 
     def draw_labels(graph):
         for node in graph.nodes():
@@ -335,7 +334,7 @@ def method2(L, numRegions):
 
     write_state_png()
 
-    for (key, lock) in needy_squidi_keylock_algo(MST, spawn_node, numRegions/3):
+    for (key, lock) in needy_squidi_keylock_algo(MST, spawn_node, exit_node, numRegions/3):
         print key, lock
         on_key(key)
         on_gate(lock)
