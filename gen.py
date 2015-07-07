@@ -281,14 +281,11 @@ def method2(L, numRegions):
 
     # create graph rep
     C = nx.Graph()
-    regions = set()
     # print 'region adjacencies'
     for (a,b) in adj:
         if a == ' ':
             continue
         C.add_edge(a,b)
-        regions.add(a)
-        regions.add(b)
         # print (a,b), '-->', adj[(a,b)]
 
     labels = {}
@@ -338,7 +335,7 @@ def method2(L, numRegions):
 
     write_state_png()
 
-    for (key, lock) in squidi_keylock_algo(MST, spawn_node, numRegions/3):
+    for (key, lock) in needy_squidi_keylock_algo(MST, spawn_node, numRegions/3):
         print key, lock
         on_key(key)
         on_gate(lock)
@@ -357,6 +354,6 @@ def v_case():
     for (key, lock) in needy_squidi_keylock_algo(T, 1, 1):
         print key, lock
 
-v_case()
+# v_case()
 
-# method2(int(sys.argv[1]), int(sys.argv[2]))
+method2(int(sys.argv[1]), int(sys.argv[2]))
