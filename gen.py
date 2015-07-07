@@ -203,6 +203,58 @@ def squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
 
         yield (key, lock)
 
+def needy_squidi_keylock_algo(tree, spawn_node, ideal_zone_size):
+
+    needed_nodes = set()
+
+    def mark_needed(u):
+        """ By definition, if a node is needed, all its ancestors are as well """
+        for u in yield_ancestors(tree, u):
+            needed_nodes.add(u)
+
+    # choose a random leaf to be the exit
+    sizes = eval_subtree_sizes(tree, spawn_node)
+    exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
+    mark_needed(exit_node)
+    print 'exit node = ', exit_node
+
+    remaining = tree
+    while len(remaining.nodes()) > 1:
+        # stop if only the spawn node is left
+
+        # find subtree of appropriate size for this zone
+        sizes = eval_subtree_sizes(remaining, spawn_node)
+
+        best = None
+        bestsize = 0
+        for node in sizes:
+            # only consider needed nodes
+            if node not in needed_nodes:
+                continue
+            # also don't ever lock the spawn node
+            if node == spawn_node:
+                continue
+            size = sizes[node]
+            if best == None or abs(size-ideal_zone_size) < abs(bestsize-ideal_zone_size):
+                best = node
+                bestsize = size
+
+        if not best:
+            # we couldn't find any eligible, needed nodes. must be done.
+            break
+
+        # place lock at root of subtree
+        lock = best
+        mark_needed(lock)
+
+        # update and pick key location
+        remaining = copy_graph_without_subtree(remaining, spawn_node, lock)
+        key = random.choice(remaining.nodes())
+        # the key is also needed now
+        mark_needed(key)
+
+        yield (key, lock)
+
 def method2(L, numRegions):
     if not numRegions:
         numRegions = L*L/100
@@ -210,6 +262,8 @@ def method2(L, numRegions):
 
     # first spread the border a bit, so the level doesn't look squareish
     # avoid square shape
+# TODO should modulate with some perlin noise. with high-res, the spreading just ends up looking
+# noisey but still very circular.
     for (u,_) in G.piter_outside_radius(L/2-1):
         G.pset(u, 'b')
     seed_spread(['b'], 0, G, ' ', L*L/6 )
@@ -243,10 +297,9 @@ def method2(L, numRegions):
 
     MSTundir = nx.minimum_spanning_tree(C)
     spawn_node = seedvals[0]
+    # tree with the spawn node as the root
     MST = nx.dfs_tree(MSTundir, spawn_node)
     nodepos = G.compute_centroids()
-
-    # pick a leaf for exit
 
     colors[spawn_node] = 'b'
     labels[spawn_node] += ' START'
@@ -301,9 +354,9 @@ def v_case():
     T.add_edge(1,2)
     T.add_edge(1,3)
 
-    for (key, lock) in squidi_keylock_algo(T, 1, 1):
+    for (key, lock) in needy_squidi_keylock_algo(T, 1, 1):
         print key, lock
 
-# v_case()
+v_case()
 
-method2(int(sys.argv[1]), int(sys.argv[2]))
+# method2(int(sys.argv[1]), int(sys.argv[2]))

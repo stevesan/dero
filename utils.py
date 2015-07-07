@@ -473,6 +473,12 @@ def find_ancestor_family(G, leaf, maxsize, sizes):
                 u = parent
 
 
+def yield_ancestors(G, start):
+    u = start
+    while u:
+        yield u
+        u = get_parent(G, u)
+
 def yield_dfs(G, root, stopset):
     if stopset and root in stopset:
         return
