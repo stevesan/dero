@@ -1,5 +1,6 @@
 
 import numpy
+import math
 import pylab
 import random
 import noise
@@ -7,11 +8,6 @@ from planar import Vec2
 from Queue import *
 import sys
 
-vonNeumannNhoodDX = [1, 0, -1, 0]
-vonNeumannNhoodDY = [0, 1, 0, -1]
-
-nbor8dx = [1, 1, 0, -1, -1, -1, 0, 1]
-nbor8dy = [0, 1, 1, 1, 0, -1, -1, -1]
 
 def char_times(c, x):
     rv = ''
@@ -21,6 +17,40 @@ def char_times(c, x):
 
 def add2(a,b):
     return (a[0]+b[0], a[1]+b[1])
+
+class IntMatrix2:
+    def __init__(self, elems):
+        """ elems should be row-major list of elements, ie. (e_00, e_01, e_10, e_11) """
+        self.elems = elems
+
+    def transform(m, u):
+        return Int2(
+                m.elems[0] * u.x + m.elems[1] * u.y,
+                m.elems[2] * u.x + m.elems[3] * u.y)
+
+    @staticmethod
+    def new_rotation(rads):
+        elems = [
+            math.cos(rads), -1*math.sin(rads),
+            math.sin(rads), math.cos(rads)
+        ]
+        return IntMatrix2(elems)
+
+    @staticmethod
+    def new_scale(s):
+        elems = [
+            s, 0.0,
+            0.0, s
+        ]
+        return IntMatrix2(elems)
+
+
+INT_CCW_QUARTER_ROT_MATRICES = [
+    IntMatrix2.new_rotation(0),
+    IntMatrix2.new_rotation(math.pi/2),
+    IntMatrix2.new_rotation(math.pi),
+    IntMatrix2.new_rotation(math.pi*3/2)
+    ]
 
 class Int2:
     x = 0
@@ -53,13 +83,13 @@ class Int2:
         """ in ccw order """
         p = self
         for i in range(4):
-            yield Int2(p.x+vonNeumannNhoodDX[i], p.y+vonNeumannNhoodDY[i])
+            yield p + EDGE_TO_NORM[i]
 
     def yield_4nbors_rand(self):
         """ in random order """
         p = self
         for i in numpy.random.permutation(4):
-            yield Int2(p.x+vonNeumannNhoodDX[i], p.y+vonNeumannNhoodDY[i])
+            yield p + EDGE_TO_NORM[i]
 
     def yield_8nbors(self):
         """ in ccw order """
@@ -73,13 +103,14 @@ class Int2:
         for i in numpy.random.permutation(8):
             yield Int2(p.x+nbor8dx[i], p.y+nbor8dy[i])
 
-    def astuple(self): return (self.x, self.y)
+    def astuple(self):
+        return (self.x, self.y)
+
+    def turn(self, turns):
+        """ CCW 90-degree multiple turn """
+        return INT_CCW_QUARTER_ROT_MATRICES[turns].transform(self)
 
 class Grid2:
-    W = 1
-    H = 1
-    grid = None
-
     def __init__(self,_W, _H, default):
         self.W = _W
         self.H = _H
@@ -292,6 +323,15 @@ class Grid2:
 
         return value2cent
 
+EDGE_TO_NORM = [
+    Int2(1, 0),
+    Int2(0, 1),
+    Int2(-1, 0),
+    Int2(0, -1)
+]
+
+nbor8dx = [1, 1, 0, -1, -1, -1, 0, 1]
+nbor8dy = [0, 1, 1, 1, 0, -1, -1, -1]
 
 def vec2_dist(a,b): return (a-b).length
                     
@@ -402,7 +442,7 @@ class FrontManager:
             if not found:
                 print 'ERROR: '+u
 
-def seed_spread(seedvals, sews, G, freevalue, maxspreads):
+def seed_spread(seedvals, sews, G, freevalue, max_spreads):
     seedvalset = set(seedvals)
     front = FrontManager(G, freevalue, seedvalset)
     front.recompute()
@@ -422,9 +462,9 @@ def seed_spread(seedvals, sews, G, freevalue, maxspreads):
 
     # spread iteration
     spreads = 0
-    while front.size() > 0 and spreads < maxspreads:
-        if spreads % 100 == 0:
-            print '\r %d' %spreads,
+    while front.size() > 0 and spreads < max_spreads:
+        if spreads % 1000 == 0:
+            print '%d/%d' % (spreads, max_spreads)
         # spread
         u = front.sample()
         # choose a random region, which nbors this front cell, to spread to it
@@ -520,3 +560,53 @@ def pick_min(items, score_func):
             best_score = score
     return best
         
+def asc(a,b):
+    if b < a:
+        return (b, a)
+    else:
+        return (a, b)
+
+TEST_POLYS = [
+    [
+        (0,0),
+        (0.5, 1),
+        (1,0),
+        (0,0,)
+    ],
+    [
+        (1,0),
+        (1.5, 1),
+        (2,0),
+        (1,0,)
+    ],
+    ]
+
+
+def polygonate(G, is_in):
+    polys = []
+    edge_done_grid = Grid2(G.W, G.H, 0)
+
+    def left_vert(
+
+    def trace_polygon(u, edge, poly):
+        print u, edge
+        pass
+
+    for (u,val) in G.piter():
+        if not is_in(val):
+            continue
+        dones = edge_done_grid.pget(u)
+        for edge in range(4):
+            if (dones | (1 << edge)) > 0:
+                continue
+            v = u + EDGE_TO_NORM[edge]
+            if is_in(G.pget(v)):
+                continue
+            poly = []
+            polys += [poly]
+            trace_polygon(u, edge, poly)
+
+    return TEST_POLYS
+
+
+

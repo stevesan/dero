@@ -1,25 +1,32 @@
 
-NEXT: construct more balanced spanning tree
-NEXT: write doom wad!! with simple "idea" module
-NEXT: need to bias key placement toward small subtrees
-
 current algo:
-
-    DONE seed spread
-    DONE get conn graph
-    DONE compute MST
-    DONE do goal placement (squidi's idea)
-
-        given exit pos, nodes per zone, key
-        if key
-            place key in any node, possibly far from exit
-
-        up from exit, find biggest subtree <= nodes per zone
-        make subtree myExit, make it locked.
-        recurse( myExit, maxNodesPerZone, key=key(myExit) )
 
     add allowed cycles (split tree into regions, etc.)
 
 TODO: find better 2d math lib? euclid is alright. just need line intersection
 
 LATER: pre-fill smaller components before initial seedings
+
+----------------------------------------
+7/6/2015
+
+Squidi's algo as is has one major issue: It can result in certain locks being totally skippable. The easiest way to see this is with the "V" case in my notebook. I came up with a fairly simple solution while flying back from Atlanta: We'll define a node as "needed" if its subtree contains either a needed key, or a needed lock, or the exit. A needed lock is simply a lock on a node that is needed, and a needed key is just a key to a needed lock. You can convince yourself pretty easily that if we only place needed locks, this makes every puzzle needed and unskippable due to the subtree relationship.
+
+So to generate a puzzle-tree that is entirely unskippable, we can use this algorithm:
+- First, mark the exit and all its ancestors as 'needed'. It's easy to see this is correct by definition.
+- When placing a lock, only choose from needed nodes.
+- When placing a key for a lock (which is going to be a needed lock), choose any node, but mark all its ancestors as needed.
+
+That's about it. I implemented it, and it works quite well. I'm calling it the "needy Squidi algo".
+
+I also added some logic for key placement. If you place a key too close to its lock, it's pretty lame, so I put in some logic to pick a node furthest from any existing needed nodes. This seems to work just fine as a first approximation.
+
+So as of now, the high-level algorithm is:
+- Seed-and-spread to get area image
+- Compute area adjacency graph and then its spanning tree (the "area tree")
+- Run needy-Squidi-algo on area tree to get puzzle graph
+
+I'm loving Python as a language for this. NetworkX has proven to be an amazing graph library, Pylab is great for math and visualization, and Python's functional-ish features (lambdas, list comprehensions, yield-style corountines) really rub me the right way. And having an interpretted language is great for rapid, dare I say 'artistic', iteration. It would be a pleasure to write game logic in Python with hot-loading, if that were done correctly (hotloading code is, apparently, not easy at all).
+
+Next major step: Produce the 2D geometry given the puzzle graph and the area image. I'm thinking..some marching-cubes-ish algorithm.
+

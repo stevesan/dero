@@ -214,7 +214,7 @@ def needy_squidi_keylock_algo(tree, spawn_node, exit_node, ideal_zone_size):
 
     mark_needed(exit_node)
     remaining = tree
-    while len(remaining.nodes()) > ideal_zone_size/2:
+    while len(remaining.nodes()) > ideal_zone_size:
         # stop if only the spawn node is left
 
         # find subtree of appropriate size for this zone
@@ -225,7 +225,7 @@ def needy_squidi_keylock_algo(tree, spawn_node, exit_node, ideal_zone_size):
         lock = pick_min( eligible, score_func )
         if not lock:
             break
-        mark_needed(lock)
+# mark_needed(lock) # this is unnecessary
 
         # update and pick key location
         remaining = copy_graph_without_subtree(remaining, spawn_node, lock)
@@ -258,47 +258,51 @@ def method2(L, numRegions):
 # noisey but still very circular.
     for (u,_) in G.piter_outside_radius(L/2-1):
         G.pset(u, 'b')
+    print 'spreading border'
     seed_spread(['b'], 0, G, ' ', L*L/6 )
 
     seedvals = [str(i) for i in range(numRegions)]
+
     colors = {}
     for val in seedvals:
         colors[val] = 'w'
 
+    print 'spreading seeds'
     seed_spread(seedvals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
-
-    adj = G.value_adjacency()
+    print 'computing area adj'
+    adj_dict = G.value_adjacency()
 
     # create graph rep
-    C = nx.Graph()
+    adj_graph = nx.Graph()
     # print 'region adjacencies'
-    for (a,b) in adj:
+    for (a,b) in adj_dict:
         if a == ' ':
             continue
-        C.add_edge(a,b)
-        # print (a,b), '-->', adj[(a,b)]
+        adj_graph.add_edge(a,b)
 
     labels = {}
-    for node in C.nodes():
-        labels[node] = str(node)
+    for node in adj_graph.nodes():
+# labels[node] = str(node)
+        labels[node] = ''
 
-    MSTundir = nx.minimum_spanning_tree(C)
-    spawn_node = seedvals[0]
+    print 'computing area tree'
+    und_area_tree = nx.minimum_spanning_tree(adj_graph)
     # tree with the spawn node as the root
-    MST = nx.dfs_tree(MSTundir, spawn_node)
+    spawn_node = seedvals[0]
+    area_tree = nx.dfs_tree(und_area_tree, spawn_node)
     nodepos = G.compute_centroids()
 
     colors[spawn_node] = 'b'
-    labels[spawn_node] += ' SP'
+    labels[spawn_node] += 'SP'
 
     # choose a random leaf to be the exit
-    sizes = eval_subtree_sizes(MST, spawn_node)
+    sizes = eval_subtree_sizes(area_tree, spawn_node)
     exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
     print 'exit node = ', exit_node
     colors[exit_node] = 'g'
-    labels[exit_node] += ' EX'
+    labels[exit_node] += 'EX'
 
     def draw_labels(graph):
         for node in graph.nodes():
@@ -308,8 +312,6 @@ def method2(L, numRegions):
 
     gates = []
     keys = []
-
-    remaining = MST.copy()
 
     def on_key(k):
         keys.append(k)
@@ -321,20 +323,21 @@ def method2(L, numRegions):
         colors[g] = 'r'
         labels[g] += ' G%d' % len(gates)
 
-        for u in yield_dfs(MST, g, set()):
+        for u in yield_dfs(area_tree, g, set()):
             colors[u] = 'r'
+        colors[g] = 'k'
 
     def write_state_png():
         pylab.figure()
-        nx.draw(MST, nodepos, node_color=[colors[v] for v in MST.nodes()])
+        nx.draw(area_tree, nodepos, node_color=[colors[v] for v in area_tree.nodes()])
         pylab.xlim([0, L])
         pylab.ylim([0, L])
-        draw_labels(MST)
+        draw_labels(area_tree)
         pylab.savefig('gates%d.png' % len(gates))
 
     write_state_png()
 
-    for (key, lock) in needy_squidi_keylock_algo(MST, spawn_node, exit_node, numRegions/3):
+    for (key, lock) in needy_squidi_keylock_algo(area_tree, spawn_node, exit_node, numRegions/3):
         print key, lock
         on_key(key)
         on_gate(lock)
@@ -342,6 +345,10 @@ def method2(L, numRegions):
 
     pylab.figure()
     G.show_image()
+    # write adjacency positions too, ie. the doors from one area to the next
+    for (a,b) in adj_graph.edges():
+        (u,v) = adj_dict[asc(a,b)]
+        pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
     pylab.savefig('grid.png')
 
 
@@ -355,4 +362,20 @@ def v_case():
 
 # v_case()
 
-method2(int(sys.argv[1]), int(sys.argv[2]))
+# method2(int(sys.argv[1]), int(sys.argv[2]))
+
+def test_polygonize():
+    G = Grid2(3,3,0)
+    G.set(1,1,1)
+    polys = polygonate(G, lambda x : x == 1)
+    for poly in polys:
+        pylab.plot([u[0] for u in poly], [u[1] for u in poly], '.-')
+
+    pylab.show()
+
+print Int2(1,0).turn(0)
+print Int2(1,0).turn(1)
+print Int2(1,0).turn(2)
+print Int2(1,0).turn(3)
+print Int2(1,0).turn(1).turn(1).turn(1).turn(1)
+test_polygonize()
