@@ -7,6 +7,7 @@ import noise
 from planar import Vec2
 from Queue import *
 import sys
+from euclid import *
 
 
 def char_times(c, x):
@@ -31,8 +32,8 @@ class IntMatrix2:
     @staticmethod
     def new_rotation(rads):
         elems = [
-            math.cos(rads), -1*math.sin(rads),
-            math.sin(rads), math.cos(rads)
+            int(math.cos(rads)), int(-1*math.sin(rads)),
+            int(math.sin(rads)), int(math.cos(rads))
         ]
         return IntMatrix2(elems)
 
@@ -44,13 +45,8 @@ class IntMatrix2:
         ]
         return IntMatrix2(elems)
 
-
-INT_CCW_QUARTER_ROT_MATRICES = [
-    IntMatrix2.new_rotation(0),
-    IntMatrix2.new_rotation(math.pi/2),
-    IntMatrix2.new_rotation(math.pi),
-    IntMatrix2.new_rotation(math.pi*3/2)
-    ]
+INT2_CCW_QUARTER_ROT_MATRICES = [ IntMatrix2.new_rotation(math.pi/2*i) for i in range(4) ]
+VECTOR2_CCW_QUARTER_ROT_MATRICES = [ Matrix3.new_rotate(math.pi/2*i) for i in range(4) ]
 
 class Int2:
     x = 0
@@ -108,7 +104,7 @@ class Int2:
 
     def turn(self, turns):
         """ CCW 90-degree multiple turn """
-        return INT_CCW_QUARTER_ROT_MATRICES[turns].transform(self)
+        return INT2_CCW_QUARTER_ROT_MATRICES[turns].transform(self)
 
 class Grid2:
     def __init__(self,_W, _H, default):
@@ -581,32 +577,65 @@ TEST_POLYS = [
     ],
     ]
 
+def turned_center_offset(u, offset, turns):
+    center = Vector2(u.x+0.5, u.y+0.5)
+    return center + VECTOR2_CCW_QUARTER_ROT_MATRICES[turns] * offset
+
+def left_vert(u, edge):
+    return turned_center_offset(u, Vector2(0.5, 0.5), edge)
+
+def right_vert(u, edge):
+    return turned_center_offset(u, Vector2(0.5, -0.5), edge)
 
 def polygonate(G, is_in):
     polys = []
     edge_done_grid = Grid2(G.W, G.H, 0)
 
-    def left_vert(
-
-    def trace_polygon(u, edge, poly):
+    def trace_polygon(u, edge, poly, first):
         print u, edge
-        pass
+        dones = edge_done_grid.pget(u)
+        if (dones & (1 << edge)) > 0:
+            print 'done'
+            return
+
+        # the last one in the chain will take of our left-vert, so don't worry about it
+        poly += [ right_vert(u, edge) ]
+        print poly
+        new_done = dones | (1<<edge)
+        edge_done_grid.pset(u, new_done)
+
+        v_right = u + Int2(0,-1).turn(edge)
+        if not is_in(G.pget(v_right)):
+            trace_polygon( u, (edge-1)%4, poly, False )
+        else:
+            v_right_fwd = u + Int2(1,-1).turn(edge)
+            if is_in(G.pget(v_right_fwd)):
+                trace_polygon( v_right_fwd, (edge+1)%4, poly, False )
+            else:
+                trace_polygon( v_right, edge, poly, False )
 
     for (u,val) in G.piter():
         if not is_in(val):
             continue
-        dones = edge_done_grid.pget(u)
         for edge in range(4):
-            if (dones | (1 << edge)) > 0:
+            dones = edge_done_grid.pget(u)
+            if (dones & (1 << edge)) > 0:
                 continue
             v = u + EDGE_TO_NORM[edge]
+            if not G.check(v):
+                continue
             if is_in(G.pget(v)):
                 continue
             poly = []
             polys += [poly]
-            trace_polygon(u, edge, poly)
+            print u, edge
+            trace_polygon(u, edge, poly, True)
 
-    return TEST_POLYS
+    return polys
+# return TEST_POLYS
 
-
+def plot_poly(verts, style):
+    xx = [v.x for v in verts] + [verts[0].x]
+    yy = [v.y for v in verts] + [verts[0].y]
+    pylab.plot( xx, yy, style )
 

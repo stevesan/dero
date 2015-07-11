@@ -368,14 +368,24 @@ def test_polygonize():
     G = Grid2(3,3,0)
     G.set(1,1,1)
     polys = polygonate(G, lambda x : x == 1)
+    colors = 'rgbky'
+    ci = 0
     for poly in polys:
-        pylab.plot([u[0] for u in poly], [u[1] for u in poly], '.-')
-
+        c = colors[ci % len(colors)]
+        plot_poly(poly, c+'.-')
+        ci += 1
     pylab.show()
 
-print Int2(1,0).turn(0)
-print Int2(1,0).turn(1)
-print Int2(1,0).turn(2)
-print Int2(1,0).turn(3)
-print Int2(1,0).turn(1).turn(1).turn(1).turn(1)
+def test_quat_turns():
+    print Int2(1,0).turn(0)
+    print Int2(1,0).turn(1)
+    print Int2(1,0).turn(2)
+    print Int2(1,0).turn(3)
+    print Int2(1,0).turn(1).turn(1).turn(1).turn(1)
+
+def test_left_vert():
+    poly = [left_vert(Int2(0,2), edge) for edge in range(4)]
+    plot_poly( poly, '.-' )
+    pylab.show()
+
 test_polygonize()
