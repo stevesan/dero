@@ -587,9 +587,12 @@ def left_vert(u, edge):
 def right_vert(u, edge):
     return turned_center_offset(u, Vector2(0.5, -0.5), edge)
 
-def polygonate(G, is_in):
+def polygonate(G, is_in_val):
     polys = []
     edge_done_grid = Grid2(G.W, G.H, 0)
+
+    def is_in(u):
+        return G.check(u) && is_in_val(G.pget(u))
 
     def trace_polygon(u, edge, poly, first):
         print u, edge
@@ -605,26 +608,24 @@ def polygonate(G, is_in):
         edge_done_grid.pset(u, new_done)
 
         v_right = u + Int2(0,-1).turn(edge)
-        if not is_in(G.pget(v_right)):
+        if not is_in(v_right)):
             trace_polygon( u, (edge-1)%4, poly, False )
         else:
             v_right_fwd = u + Int2(1,-1).turn(edge)
-            if is_in(G.pget(v_right_fwd)):
+            if is_in(v_right_fwd):
                 trace_polygon( v_right_fwd, (edge+1)%4, poly, False )
             else:
                 trace_polygon( v_right, edge, poly, False )
 
     for (u,val) in G.piter():
-        if not is_in(val):
+        if not is_in(u):
             continue
         for edge in range(4):
             dones = edge_done_grid.pget(u)
             if (dones & (1 << edge)) > 0:
                 continue
             v = u + EDGE_TO_NORM[edge]
-            if not G.check(v):
-                continue
-            if is_in(G.pget(v)):
+            if is_in(v)):
                 continue
             poly = []
             polys += [poly]
