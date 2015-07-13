@@ -592,30 +592,34 @@ def polygonate(G, is_in_val):
     edge_done_grid = Grid2(G.W, G.H, 0)
 
     def is_in(u):
-        return G.check(u) && is_in_val(G.pget(u))
+        return G.check(u) and is_in_val(G.pget(u))
 
-    def trace_polygon(u, edge, poly, first):
-        print u, edge
-        dones = edge_done_grid.pget(u)
-        if (dones & (1 << edge)) > 0:
-            print 'done'
-            return
+    def trace_polygon(u, edge, poly):
+        while True:
+            dones = edge_done_grid.pget(u)
+            if (dones & (1 << edge)) > 0:
+                print 'done'
+                break
 
-        # the last one in the chain will take of our left-vert, so don't worry about it
-        poly += [ right_vert(u, edge) ]
-        print poly
-        new_done = dones | (1<<edge)
-        edge_done_grid.pset(u, new_done)
+            # the last one in the chain will take of our left-vert, so don't worry about it
+            poly += [ right_vert(u, edge) ]
+# print u, edge
+# print poly
+            new_done = dones | (1<<edge)
+            edge_done_grid.pset(u, new_done)
 
-        v_right = u + Int2(0,-1).turn(edge)
-        if not is_in(v_right)):
-            trace_polygon( u, (edge-1)%4, poly, False )
-        else:
-            v_right_fwd = u + Int2(1,-1).turn(edge)
-            if is_in(v_right_fwd):
-                trace_polygon( v_right_fwd, (edge+1)%4, poly, False )
+            v_right = u + Int2(0,-1).turn(edge)
+            if not is_in(v_right):
+                u = u
+                edge = (edge-1)%4
             else:
-                trace_polygon( v_right, edge, poly, False )
+                v_right_fwd = u + Int2(1,-1).turn(edge)
+                if is_in(v_right_fwd):
+                    u = v_right_fwd
+                    edge = (edge+1)%4
+                else:
+                    u = v_right
+                    edge = edge
 
     for (u,val) in G.piter():
         if not is_in(u):
@@ -625,12 +629,12 @@ def polygonate(G, is_in_val):
             if (dones & (1 << edge)) > 0:
                 continue
             v = u + EDGE_TO_NORM[edge]
-            if is_in(v)):
+            if is_in(v):
                 continue
             poly = []
             polys += [poly]
             print u, edge
-            trace_polygon(u, edge, poly, True)
+            trace_polygon(u, edge, poly)
 
     return polys
 # return TEST_POLYS

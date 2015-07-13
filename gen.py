@@ -364,10 +364,10 @@ def v_case():
 
 # method2(int(sys.argv[1]), int(sys.argv[2]))
 
-def test_polygonize():
+def test_polygonate():
     G = Grid2(3,3,0)
     G.set(1,1,1)
-    polys = polygonate(G, lambda x : x == 1)
+    polys = polygonate(G, lambda x : x == 0)
     colors = 'rgbky'
     ci = 0
     for poly in polys:
@@ -375,6 +375,53 @@ def test_polygonize():
         plot_poly(poly, c+'.-')
         ci += 1
     pylab.show()
+
+def draw_polys(polys):
+    colors = 'rgbky'
+    ci = 0
+    for poly in polys:
+        c = colors[ci % len(colors)]
+        plot_poly(poly, c+'.-')
+        ci += 1
+
+def test_polygonate_2():
+    G = Grid2(10,10,0)
+    G.set(1,1,1)
+    G.set(1,2,1)
+    G.set(2,2,1)
+    G.set(2,3,1)
+    G.set(3,2,1)
+    G.set(3,3,1)
+    G.set(4,3,1)
+    polys = polygonate(G, lambda x : x == 1)
+    draw_polys(polys)
+    pylab.xlim([-1, G.W+1])
+    pylab.ylim([-1, G.H+1])
+    pylab.grid(True)
+    pylab.show()
+
+def test_polygonate_perlin():
+    L = 400
+    G = Grid2(L, L, 0)
+    S = 10.0/L
+
+    minval = 999999.0
+    maxval = -999999
+    for (u,_) in G.piter():
+        x = u.x * S
+        y = u.y * S
+        val = noise.pnoise2(x, y)
+        G.pset(u, val)
+
+    polys = polygonate(G, lambda x : x > -0.1 and x < 0.2)
+    draw_polys(polys)
+    marx = G.W*0.1
+    mary = G.H*0.1
+    pylab.xlim([-marx, G.W+marx])
+    pylab.ylim([-mary, G.H+mary])
+    pylab.grid(True)
+    pylab.show()
+
 
 def test_quat_turns():
     print Int2(1,0).turn(0)
@@ -388,4 +435,5 @@ def test_left_vert():
     plot_poly( poly, '.-' )
     pylab.show()
 
-test_polygonize()
+# test_polygonate_2()
+test_polygonate_perlin()
