@@ -414,6 +414,10 @@ def test_polygonate_perlin():
         G.pset(u, val)
 
     polys = polygonate(G, lambda x : x > -0.1 and x < 0.2)
+
+    for i in range(len(polys)):
+        polys[i] = simplify_poly(polys[i], 0.0)
+
     draw_polys(polys)
     marx = G.W*0.1
     mary = G.H*0.1

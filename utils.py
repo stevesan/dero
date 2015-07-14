@@ -644,3 +644,34 @@ def plot_poly(verts, style):
     yy = [v.y for v in verts] + [verts[0].y]
     pylab.plot( xx, yy, style )
 
+def get_wrap(array, i):
+    return array[ i % len(array) ]
+
+def simplify_poly(poly, tol):
+    if len(poly) < 4:
+        return poly
+
+    q = Queue()
+    for v in poly:
+        q.put(v)
+
+    new_poly = []
+    a = q.get()
+    b = q.get()
+    while True:
+        if q.empty():
+            new_poly += [a,b]
+            break
+        c = q.get()
+        e1 = (b-a).normalized()
+        e2 = (c-b).normalized()
+        if abs(1.0 - e1.dot(e2)) < 1e-2:
+            # colinear. skip b.
+            a = a
+            b = c
+        else:
+            # a,b needed.
+            new_poly += [a]
+            a = b
+            b = c
+    return new_poly
