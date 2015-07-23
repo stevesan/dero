@@ -2,6 +2,27 @@ import sys
 import struct
 import pylab
 
+class Map:
+
+    def __init__(s):
+        s.things_xx = []
+        s.things_yy = []
+        s.verts = []
+        s.linedefs = []
+
+    def plot(s):
+        pylab.plot(s.things_xx, s.things_yy, '.')
+        for ld in s.linedefs:
+            p0 = s.verts[ld.i0]
+            p1 = s.verts[ld.i1]
+            pylab.plot( [p0[0], p1[0]], [p0[1], p1[1]], 'g-' )
+
+class LineDef:
+
+    def __init__(s, i0, i1):
+        s.i0 = i0
+        s.i1 = i1
+
 class WAD:
 
     def __init__(s, f):
@@ -62,29 +83,40 @@ class WAD:
         state = 'lumps'
         map_entry = None
         num_maps = 0
+        curr_map = None
+
+
         for entry in s.directory:
             s.f.seek(entry['seekpos'])
             lumpend = s.f.tell() + entry['size']
             name = entry['name']
-# print lumpend, name
+
             if name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M'):
+
+                if curr_map:
+                    pylab.figure()
+                    curr_map.plot()
+                    pylab.savefig(map_entry['name']+'.png')
+
                 assert entry['size'] == 0
                 print 'reading map ' + entry['name']
                 state = 'map'
                 map_entry = entry
+                curr_map = Map()
                 num_maps += 1
+
             elif name == 'THINGS':
                 assert state == 'map'
                 assert map_entry
                 size = entry['size']
                 assert (size % (5*2)) == 0
                 print 'THINGS size = %d, num things = %d' % (size, size/10)
-                xx = []
-                yy = []
                 pstart_found = False
                 while s.f.tell() < lumpend:
                     x = s.read_short()
                     y = s.read_short()
+                    curr_map.things_xx += [x]
+                    curr_map.things_yy += [y]
                     angle = s.read_short()
                     ttype = s.read_short()
                     options = s.read_short()
@@ -92,11 +124,24 @@ class WAD:
                         assert not pstart_found
                         pstart_found = True
                         print 'player start at %d %d' % (x,y)
+
+            elif name == 'VERTEXES':
+                while s.f.tell() < lumpend:
+                    curr_map.verts += [(s.read_short(), s.read_short())]
+
+            elif name == 'LINEDEFS':
+                while s.f.tell() < lumpend:
+                    curr_map.linedefs += [LineDef(s.read_short(), s.read_short())]
+                    flags = s.read_short()
+                    function = s.read_short()
+                    tag = s.read_short()
+                    sd_left = s.read_short()
+                    sd_right = s.read_short()
+                print 'read %d linedefs' % len(curr_map.linedefs)
+                
             elif name == 'ENDOOM':
+                # sanity check
                 assert entry['size'] == 4000
-                msg = ''
-                for i in range(2000):
-                    msg += s.f.read(2)[1]
 
 # print 'ENDOOM:\n' + msg
             # always make sure we end up at end of lump
