@@ -1,11 +1,31 @@
 
-current algo:
+NEXT: try to compile/run part of DB. try to ls a wad file
 
-    add allowed cycles (split tree into regions, etc.)
+    Source/Core:
+        IO?
+            UniversalStreamWriter does a lot of relevant stuff
+                this seems more for serialization than WAD IO
+                like CopyPaste
+            DoomMapSetIO (created dynamically by MapSetIO.Create)
+                reads into MapSet from a WAD
+                takes a wad
+                writes line defs, etc. from MapSet into mounted wad
+                'MapSet' has verts, etc.
+            what is UDMF?
+                a universal format. perhaps Dero can just output these
+            WAD
+        Map
+            has Vertex, Linedef, etc.
+        Data
+            contains code to read wads, textures, etc.
+            WADReader <--- call this to load a wad?
+                see MapManager.InitializeOpenMap -> DataManager code paths
+                create CLI wrapper for MapManager!
+                LoadTextureSet
 
-TODO: find better 2d math lib? euclid is alright. just need line intersection
+        "MapManager" calls compiler. wad in, wad out
 
-LATER: pre-fill smaller components before initial seedings
+NEXT: get source to one of the bsp compilers
 
 ----------------------------------------
 7/6/2015
@@ -29,4 +49,18 @@ So as of now, the high-level algorithm is:
 I'm loving Python as a language for this. NetworkX has proven to be an amazing graph library, Pylab is great for math and visualization, and Python's functional-ish features (lambdas, list comprehensions, yield-style corountines) really rub me the right way. And having an interpretted language is great for rapid, dare I say 'artistic', iteration. It would be a pleasure to write game logic in Python with hot-loading, if that were done correctly (hotloading code is, apparently, not easy at all).
 
 Next major step: Produce the 2D geometry given the puzzle graph and the area image. I'm thinking..some marching-cubes-ish algorithm.
+
+
+----------------------------------------
+7/15/2015
+
+A change of terminology: I'm calling 'areas' just 'spaces' now. 'Space' is more specific to what it actually is and has less abstract connotations. It's just a blob of contiguous voxels. To differentiate between different locked parts of the map, I think I'll use 'zone.' That has good military-ish connotations.
+
+The end result of the intermediate phase is then:
+- space grid
+    list of enter/exit locations
+- space graph
+- zone tree
+
+At this point, I have something that could function as a DOOM level that is non-trivial and has key-lock puzzles. So, in the spirit of "ship early", it's time to close the loop and actually make it playable in DOOM. I don't really want to write my own WAD writing pipeline, so I'm gonna try to use DoomBuilder's source code along with some node builder. Hopefully I can get nodebuilder source code and make it work on OSX - can't imagine why it wouldn't be portable code.
 

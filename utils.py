@@ -248,6 +248,7 @@ class Grid2:
         return rv
 
     def connected_components_grid(self, valueFilter):
+        """ computes connected components, returning (C,S), where C is a grid of cell->component id, and S[componet id] -> num cells in the component """
         C = Grid2(self.W, self.H, -1)
         def helper(u, cid, value):
             count = 0
@@ -258,7 +259,7 @@ class Grid2:
                     count += helper(v, cid, value)
             return count
 
-        compid = 10
+        compid = 0
         compsizes = {}
         for (u,value) in self.piter():
             if valueFilter and value != valueFilter:

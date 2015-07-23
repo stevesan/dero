@@ -254,29 +254,28 @@ def method2(L, numRegions):
 
     # first spread the border a bit, so the level doesn't look squareish
     # avoid square shape
-# TODO should modulate with some perlin noise. with high-res, the spreading just ends up looking
-# noisey but still very circular.
+    # TODO should modulate with some perlin noise. with high-res, the spreading just ends up looking
+    # noisey but still very circular.
     for (u,_) in G.piter_outside_radius(L/2-1):
         G.pset(u, 'b')
     print 'spreading border'
     seed_spread(['b'], 0, G, ' ', L*L/6 )
 
-    seedvals = [str(i) for i in range(numRegions)]
+    space_vals = [str(i) for i in range(numRegions)]
 
     colors = {}
-    for val in seedvals:
+    for val in space_vals:
         colors[val] = 'w'
 
-    print 'spreading seeds'
-    seed_spread(seedvals, 1, G, ' ', L*L)
+    print 'spreading space seeds'
+    seed_spread(space_vals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
-    print 'computing area adj'
+    print 'computing space adj'
     adj_dict = G.value_adjacency()
 
     # create graph rep
     adj_graph = nx.Graph()
-    # print 'region adjacencies'
     for (a,b) in adj_dict:
         if a == ' ':
             continue
@@ -284,21 +283,20 @@ def method2(L, numRegions):
 
     labels = {}
     for node in adj_graph.nodes():
-# labels[node] = str(node)
         labels[node] = ''
 
-    print 'computing area tree'
-    und_area_tree = nx.minimum_spanning_tree(adj_graph)
+    print 'computing space tree'
+    und_space_tree = nx.minimum_spanning_tree(adj_graph)
     # tree with the spawn node as the root
-    spawn_node = seedvals[0]
-    area_tree = nx.dfs_tree(und_area_tree, spawn_node)
+    spawn_node = space_vals[0]
+    space_tree = nx.dfs_tree(und_space_tree, spawn_node)
     nodepos = G.compute_centroids()
 
     colors[spawn_node] = 'b'
     labels[spawn_node] += 'SP'
 
     # choose a random leaf to be the exit
-    sizes = eval_subtree_sizes(area_tree, spawn_node)
+    sizes = eval_subtree_sizes(space_tree, spawn_node)
     exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
     print 'exit node = ', exit_node
     colors[exit_node] = 'g'
@@ -323,21 +321,21 @@ def method2(L, numRegions):
         colors[g] = 'r'
         labels[g] += ' G%d' % len(gates)
 
-        for u in yield_dfs(area_tree, g, set()):
+        for u in yield_dfs(space_tree, g, set()):
             colors[u] = 'r'
         colors[g] = 'k'
 
     def write_state_png():
         pylab.figure()
-        nx.draw(area_tree, nodepos, node_color=[colors[v] for v in area_tree.nodes()])
+        nx.draw(space_tree, nodepos, node_color=[colors[v] for v in space_tree.nodes()])
         pylab.xlim([0, L])
         pylab.ylim([0, L])
-        draw_labels(area_tree)
+        draw_labels(space_tree)
         pylab.savefig('gates%d.png' % len(gates))
 
     write_state_png()
 
-    for (key, lock) in needy_squidi_keylock_algo(area_tree, spawn_node, exit_node, numRegions/3):
+    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_node, exit_node, numRegions/3):
         print key, lock
         on_key(key)
         on_gate(lock)
@@ -345,7 +343,7 @@ def method2(L, numRegions):
 
     pylab.figure()
     G.show_image()
-    # write adjacency positions too, ie. the doors from one area to the next
+    # write adjacency positions too, ie. the doors from one space to the next
     for (a,b) in adj_graph.edges():
         (u,v) = adj_dict[asc(a,b)]
         pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
@@ -362,7 +360,6 @@ def v_case():
 
 # v_case()
 
-# method2(int(sys.argv[1]), int(sys.argv[2]))
 
 def test_polygonate():
     G = Grid2(3,3,0)
@@ -440,4 +437,5 @@ def test_left_vert():
     pylab.show()
 
 # test_polygonate_2()
-test_polygonate_perlin()
+# test_polygonate_perlin()
+method2(int(sys.argv[1]), int(sys.argv[2]))
