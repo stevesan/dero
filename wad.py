@@ -360,12 +360,6 @@ class WADIO:
             if s.is_map_start_lump(name):
                 if _map:
                     # finish off current map
-                    pylab.figure()
-                    print 'plotting ...'
-                    _map.plot()
-                    pylab.grid(True)
-                    pylab.savefig(map_entry.name+'.png')
-                    print 'done plotting'
                     content.maps += [_map]
 
                 assert entry.size == 0
@@ -396,4 +390,12 @@ if __name__ == "__main__":
     with open(sys.argv[1], 'rb') as f:
         wad = WADIO(f)
         wad.verbose = True
-        wad.read()
+        contents = wad.read()
+
+        # draw first map
+        pylab.figure()
+        print 'plotting ...'
+        contents.maps[0].plot()
+        pylab.grid(True)
+        pylab.savefig(contents.maps[0].name+'.png')
+        print 'done plotting'
