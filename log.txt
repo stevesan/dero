@@ -1,5 +1,11 @@
 
-NEXT: try to compile/run part of DB. try to ls a wad file
+what are:
+SEGS - part of BSP
+SSECTORS - part of BSP
+REJECT
+BLOCKMAP
+
+try to compile/run part of DB. try to ls a wad file
 
     Source/Core:
         IO?
@@ -25,7 +31,9 @@ NEXT: try to compile/run part of DB. try to ls a wad file
 
         "MapManager" calls compiler. wad in, wad out
 
-NEXT: get source to one of the bsp compilers
+get source to one of the bsp compilers
+
+NEXT: write a dummy map and run it in DOOM
 
 ----------------------------------------
 7/6/2015
