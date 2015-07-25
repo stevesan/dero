@@ -72,3 +72,5 @@ The end result of the intermediate phase is then:
 
 At this point, I have something that could function as a DOOM level that is non-trivial and has key-lock puzzles. So, in the spirit of "ship early", it's time to close the loop and actually make it playable in DOOM. I don't really want to write my own WAD writing pipeline, so I'm gonna try to use DoomBuilder's source code along with some node builder. Hopefully I can get nodebuilder source code and make it work on OSX - can't imagine why it wouldn't be portable code.
 
+----------------------------------------
+

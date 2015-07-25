@@ -1,7 +1,7 @@
 import sys
 import struct
 import pylab
-
+from Queue import * 
 
 class LumpStruct:
 
@@ -105,6 +105,11 @@ class SideDef(LumpStruct):
 
     def get_fields(s): return SideDef.FIELDS
 
+class DummyLump(LumpStruct):
+    """ Used for directory markers, like levels """
+    FIELDS = []
+    def get_fields(s): return DummyLump.FIELDS
+
 def get_color_for_thing(thing_type):
     if thing_type == 1:
         return 'g'
@@ -113,7 +118,8 @@ def get_color_for_thing(thing_type):
 
 class Map:
 
-    def __init__(s):
+    def __init__(s, name):
+        s.name = name
         s.things = []
         s.verts = []
         s.linedefs = []
@@ -153,6 +159,30 @@ class Map:
             uniqs.add(sd.midtex)
         return uniqs
 
+    def handle_lump(s, io, lump, lumpend):
+        name = lump.name
+        if name == 'THINGS':
+            s.things = io.read_array_lump(lumpend, WadThing)
+            for thing in s.things:
+                if thing.type == 1:
+                    print 'player start at %d %d' % (thing.x,thing.y)
+
+        elif name == 'VERTEXES':
+            while io.f.tell() < lumpend:
+                s.verts += [(io.read_short(), io.read_short())]
+
+        elif name == 'LINEDEFS':
+            s.linedefs = io.read_array_lump(lumpend, LineDef)
+        
+        elif name == 'SIDEDEFS':
+            s.sidedefs = io.read_array_lump(lumpend, SideDef)
+
+        elif name == 'SECTORS':
+            s.sectors = io.read_array_lump(lumpend, Sector)
+        else:
+            return False
+
+        return True
 
 def read(s, wad, lumpend, clazz):
 
@@ -160,10 +190,12 @@ def read(s, wad, lumpend, clazz):
         for data in s.array:
             data.write(wad)
 
-class WAD:
+class WADWriter:
+    """ Handles specifics of writing WADs """
 
     def __init__(s):
         s.lumps = {}
+        s.header = 'PWAD'
 
     def add_lump(s, name, data):
         if name in s.lumps:
@@ -173,7 +205,7 @@ class WAD:
     def write(s, fout):
         total_lump_size = sum([ lump.get_size() for lump in s.lumps])
         dir_offset = 4 + 8 + 8 + total_lump_size
-        directory = {}
+        directory = []
 
 # for lump in s.lumps:
 # directory[lump] = 
@@ -187,11 +219,33 @@ class WAD:
 
         lumpstart = 4 + 8 + 8
 
-
         for lump in lumps:
-            lump.write
+            data = lumps[lump]
+            if type(data) == list:
+                io.write_array_lump(data)
+            else:
+                data.write(io)
+            # create dir entry
+            entry = LumpInfo()
+            entry.clear()
+            entry.name = lump
+            entry.size = data.get_size()
+            entry.filepos = lumpstart
+            directory += [entry]
+            lumpstart += entry.size
+
+        assert lumpstart == dir_offset
+        io.write_array_lump(directory)
+
+class WADContent:
+    """ Should contain all essential contents of a WAD """
+
+    def __init__(s):
+        s.maps = []
+        s.other_lumps = []
 
 class WADIO:
+    """ Low-level operations for read/writing lumps """
 
     def __init__(s, f):
         s.f = f
@@ -221,8 +275,8 @@ class WADIO:
         assert s.state == 'inited'
         s.state = 'header'
 
-        tag = s.f.read(4)
-        assert tag == 'IWAD' or tag == 'PWAD'
+        header = s.f.read(4)
+        assert header == 'IWAD' or header == 'PWAD'
 
         s.num_lumps = s.read_long()
         if s.verbose: print 'num lumps: ' + str(s.num_lumps)
@@ -233,7 +287,9 @@ class WADIO:
         s.f.seek(s.dir_offset)
         s.read_directory()
         s.f.seek(s.lumps_offset)
-        s.read_lumps()
+        rv = WADContent()
+        s.read_lumps(rv)
+        return rv
 
     def read_long(s):
         return struct.unpack('i', s.f.read(4))[0]
@@ -282,78 +338,59 @@ class WADIO:
         for block in array:
             block.write(s)
 
-    def read_lumps(s):
+    def is_map_start_lump(s, name):
+        return name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M')
+
+    def read_lumps(s, content):
 
         total_lump_size = sum([entry.size for entry in s.directory])
         print 'total lump size: %d' % total_lump_size
 
         state = 'lumps'
         map_entry = None
-        num_maps = 0
-        curr_map = None
+        _map = None
 
         uniq_texs = set()
-
+        
         for entry in s.directory:
             s.f.seek(entry.filepos)
             lumpend = s.f.tell() + entry.size
             name = entry.name
 
-            if name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M'):
-
-                if curr_map:
+            if s.is_map_start_lump(name):
+                if _map:
                     # finish off current map
                     pylab.figure()
                     print 'plotting ...'
-                    curr_map.plot()
+                    _map.plot()
                     pylab.grid(True)
                     pylab.savefig(map_entry.name+'.png')
                     print 'done plotting'
-                    s.maps += [curr_map]
-# print ', '.join([ t for t in curr_map.unique_textures()])
+                    content.maps += [_map]
 
                 assert entry.size == 0
                 print 'reading map ' + entry.name
                 state = 'map'
                 map_entry = entry
-                curr_map = Map()
-                num_maps += 1
+                _map = Map(entry.name)
 
-            elif name == 'THINGS':
-                assert state == 'map'
-                curr_map.things = s.read_array_lump(lumpend, WadThing)
-                for thing in curr_map.things:
-                    if thing.type == 1:
-                        print 'player start at %d %d' % (thing.x,thing.y)
-
-            elif name == 'VERTEXES':
-                assert state == 'map'
-                while s.f.tell() < lumpend:
-                    curr_map.verts += [(s.read_short(), s.read_short())]
-
-            elif name == 'LINEDEFS':
-                assert state == 'map'
-                curr_map.linedefs = s.read_array_lump(lumpend, LineDef)
-            
-            elif name == 'SIDEDEFS':
-                assert state == 'map'
-                curr_map.sidedefs = s.read_array_lump(lumpend, SideDef)
-
-            elif name == 'SECTORS':
-                assert state == 'map'
-                curr_map.sectors = s.read_array_lump(lumpend, Sector)
-                
+            elif _map and _map.handle_lump(s, entry, lumpend):
+                # no need to do anything - it handled it
+                pass
+                    
             elif name == 'ENDOOM':
                 # sanity check
                 assert entry.size == 4000
 
+            else:
+                # ignore this lump
+                pass
+
 # print 'ENDOOM:\n' + msg
-            # always make sure we end up at end of lump
-            s.f.seek( lumpend )
 
         print 'finished reading lumps'
         print 'curr pos: %d, dir start pos: %d' % (s.f.tell(), s.dir_offset)
-        print 'read %d maps' % num_maps
+        print 'read %d maps' % len(content.maps)
 
 if __name__ == "__main__":
     with open(sys.argv[1], 'rb') as f:
