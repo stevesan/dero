@@ -219,21 +219,16 @@ class Map:
         name = lump.name
         if name == 'THINGS':
             s.things += io.read_array_lump(lumpend, Thing)
-
         elif name == 'VERTEXES':
             s.verts += io.read_array_lump(lumpend, Vertex)
-
         elif name == 'LINEDEFS':
             s.linedefs += io.read_array_lump(lumpend, LineDef)
-        
         elif name == 'SIDEDEFS':
             s.sidedefs += io.read_array_lump(lumpend, SideDef)
-
         elif name == 'SECTORS':
             s.sectors += io.read_array_lump(lumpend, Sector)
         else:
             return False
-
         return True
 
     def append_lumps(s, lumps):
@@ -246,40 +241,42 @@ class Map:
         ArrayLump('SECTORS', s.sectors),
         ]
 
-def write_wad(fout, header, lumps):
-    io = WADFile(fout)
-    fout.write('PWAD')
-    io.write_long( len(lumps) )
+def write_wad(path, header, lumps):
+    with open(path, 'wb') as fout:
+        """ Writes an array of lumps to a *single* WAD file, handling proper directory setup, etc. """
+        io = WADFile(fout)
+        fout.write('PWAD')
+        io.write_long( len(lumps) )
 
-    # dir offset
-    total_lump_size = sum([ lump.get_size() for lump in lumps])
-    dir_offset = 4 + 4 + 4 + total_lump_size
-    io.write_long( dir_offset )
+        # dir offset
+        total_lump_size = sum([ lump.get_size() for lump in lumps])
+        dir_offset = 4 + 4 + 4 + total_lump_size
+        io.write_long( dir_offset )
 
-    # write lumps while bookeeping
-    lumpstart = 4 + 4 + 4
-    directory = []
+        # write lumps while bookeeping
+        lumpstart = 4 + 4 + 4
+        directory = []
 
-    print 'dir off set = %d' % dir_offset
+        print 'dir off set = %d' % dir_offset
 
-    for lump in lumps:
-        print 'start = %d, tell = %d' % (lumpstart, fout.tell())
-        assert lumpstart == fout.tell()
-        lump.write(io)
+        for lump in lumps:
+            print 'start = %d, tell = %d' % (lumpstart, fout.tell())
+            assert lumpstart == fout.tell()
+            lump.write(io)
 
-        # create dir entry
-        entry = LumpInfo()
-        entry.clear()
-        entry.name = lump.get_name()
-        entry.size = lump.get_size()
-        entry.filepos = lumpstart
+            # create dir entry
+            entry = LumpInfo()
+            entry.clear()
+            entry.name = lump.get_name()
+            entry.size = lump.get_size()
+            entry.filepos = lumpstart
 
-        directory += [entry]
-        print '%d += %d' % (lumpstart, entry.size)
-        lumpstart += entry.size
+            directory += [entry]
+            print '%d += %d' % (lumpstart, entry.size)
+            lumpstart += entry.size
 
-    assert lumpstart == dir_offset
-    io.write_array_lump(directory)
+        assert lumpstart == dir_offset
+        io.write_array_lump(directory)
 
 class WADContent:
     """ Should contain all essential contents of a WAD """
@@ -288,6 +285,33 @@ class WADContent:
         s.maps = []
         s.other_lumps = []
         s.end_msg = None
+
+    def read_lumps( s, directory, wad ):
+        _map = None
+        
+        for entry in directory:
+            wad.f.seek(entry.filepos)
+            lumpend = wad.f.tell() + entry.size
+            name = entry.name
+
+            if wad.is_map_start_lump(name):
+                assert entry.size == 0
+                print 'reading map ' + entry.name
+                _map = Map(entry.name)
+                s.maps += [_map]
+
+            elif _map and _map.handle_lump(wad, entry, lumpend):
+                # no need to do anything - it handled it
+                pass
+                    
+            elif name == 'ENDOOM':
+                # sanity check
+                assert entry.size == 4000
+                s.end_msg = s.f.read(4000)
+
+            else:
+                # ignore this lump
+                pass
 
 class WADFile:
     """ Low-level operations for read/writing lumps, for reading and writing wads """
@@ -369,9 +393,6 @@ class WADFile:
 
     def read_lumps(s, content):
 
-        total_lump_size = sum([entry.size for entry in s.directory])
-        print 'total lump size: %d' % total_lump_size
-
         _map = None
         
         for entry in s.directory:
@@ -404,6 +425,28 @@ class WADFile:
         print 'curr pos: %d, dir start pos: %d' % (s.f.tell(), s.dir_offset)
         print 'read %d maps' % len(content.maps)
 
+def read_wad(path):
+    """ This will yield (lumpinfo, wadfile) tuples for each lump """
+    with open(path, 'rb') as f:
+        wad = WADFile(f)
+
+        header = f.read(4)
+        num_lumps = wad.read_long()
+        dir_offset = wad.read_long()
+
+        assert header == 'IWAD' or header == 'PWAD'
+
+        # read directory
+        f.seek(dir_offset)
+        infosize = LumpInfo().get_size()
+        end = f.tell() + num_lumps * infosize
+        directory = wad.read_array_lump(end, LumpInfo)
+
+        # lumps
+        rv = WADContent()
+        rv.read_lumps( directory, wad )
+        return rv
+
 def save_map_png(_map, fname):
     pylab.figure()
     print 'plotting ...'
@@ -414,16 +457,11 @@ def save_map_png(_map, fname):
 
 def test_doom1_wad():
     path = dero_config.DOOM1_WAD_PATH
-    _map = None
-    with open(path, 'rb') as f:
-        wad = WADFile(f)
-        wad.verbose = False
-        content = wad.read()
+    content = read_wad(path)
 
-        assert len(content.maps) == 36
-        assert content.end_msg
-# _map = random.choice(content.maps)
-        _map = content.maps[0]
+    assert len(content.maps) == 36
+    assert content.end_msg
+    _map = content.maps[0]
 
     # filter out all things except player start
     _map.things = [t for t in _map.things if t.type == 1]
@@ -431,8 +469,7 @@ def test_doom1_wad():
     # write the map back
     lumps = []
     _map.append_lumps(lumps)
-    with open('%s.wad' % _map.name, 'wb') as f:
-        write_wad(f, 'PWAD', lumps)
+    write_wad('%s.wad' % _map.name, 'PWAD', lumps)
 
     # run bsp on it
     dero_config.build_wad( '%s.wad' % _map.name, 'test.wad' )
