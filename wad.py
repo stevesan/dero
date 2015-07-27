@@ -307,7 +307,7 @@ class WADContent:
             elif name == 'ENDOOM':
                 # sanity check
                 assert entry.size == 4000
-                s.end_msg = s.f.read(4000)
+                s.end_msg = wad.f.read(4000)
 
             else:
                 # ignore this lump
@@ -475,17 +475,13 @@ def test_doom1_wad():
     dero_config.build_wad( '%s.wad' % _map.name, 'test.wad' )
 
     # read it back
-    _map2 = None
-    with open('%s.wad' % _map.name, 'rb') as f:
-        wad = WADFile(f)
-        wad.verbose = True
-        content = wad.read()
-        assert len(content.maps) == 1
-        assert content.end_msg == None
-
-        _map2 = content.maps[0]
-        assert _map2.name == _map.name
-        assert len(_map2.verts) == len(_map.verts)
+    cont2 = read_wad('%s.wad' % _map.name)
+    assert len(cont2.maps) == 1
+    assert cont2.end_msg == None
+    _map2 = cont2.maps[0]
+    assert _map2.name == _map.name
+    assert len(_map2.verts) == len(_map.verts)
+    assert len(_map2.linedefs) == len(_map.linedefs)
 
     # draw maps for comparison
     save_map_png( _map, 'expected.png')
