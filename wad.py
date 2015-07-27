@@ -4,9 +4,13 @@ import pylab
 from Queue import * 
 import random
 
+import dero_config
+
 """
     lumps:
         read, write, 
+
+    wadio take lump array, or handlers
         """
 
 class SimpleStruct:
@@ -243,7 +247,7 @@ class Map:
         ]
 
 def write_wad(fout, header, lumps):
-    io = WADIO(fout)
+    io = WADFile(fout)
     fout.write('PWAD')
     io.write_long( len(lumps) )
 
@@ -285,8 +289,8 @@ class WADContent:
         s.other_lumps = []
         s.end_msg = None
 
-class WADIO:
-    """ Low-level operations for read/writing lumps """
+class WADFile:
+    """ Low-level operations for read/writing lumps, for reading and writing wads """
 
     def __init__(s, f):
         s.f = f
@@ -345,17 +349,14 @@ class WADIO:
         infosize = LumpInfo().get_size()
         end = s.f.tell() + s.num_lumps * infosize
         s.directory = s.read_array_lump(end, LumpInfo)
-        print 'after reading dir: ' + str(s.f.tell())
 
     def read_array_lump(s, lumpend, clazz):
         size = clazz().get_size()
-        if s.verbose: print 'lumpend = %d, size = %d' % (lumpend, size)
         assert (lumpend - s.f.tell()) % size == 0
         rv = []
         while s.f.tell() < lumpend:
             block = clazz()
             block.read(s)
-            if s.verbose: print block
             rv += [block]
         return rv
 
@@ -412,18 +413,20 @@ def save_map_png(_map, fname):
     print 'done plotting'
 
 def test_doom1_wad():
-    path = '/Users/Steve/Documents/Zandronum/DOOM.WAD'
+    path = dero_config.DOOM1_WAD_PATH
     _map = None
     with open(path, 'rb') as f:
-        io = WADIO(f)
-        io.verbose = False
-        content = io.read()
+        wad = WADFile(f)
+        wad.verbose = False
+        content = wad.read()
 
         assert len(content.maps) == 36
         assert content.end_msg
 # _map = random.choice(content.maps)
         _map = content.maps[0]
 
+    # filter out all things except player start
+    _map.things = [t for t in _map.things if t.type == 1]
 
     # write the map back
     lumps = []
@@ -431,12 +434,15 @@ def test_doom1_wad():
     with open('%s.wad' % _map.name, 'wb') as f:
         write_wad(f, 'PWAD', lumps)
 
+    # run bsp on it
+    dero_config.build_wad( '%s.wad' % _map.name, 'test.wad' )
+
     # read it back
     _map2 = None
     with open('%s.wad' % _map.name, 'rb') as f:
-        io = WADIO(f)
-        io.verbose = True
-        content = io.read()
+        wad = WADFile(f)
+        wad.verbose = True
+        content = wad.read()
         assert len(content.maps) == 1
         assert content.end_msg == None
 
