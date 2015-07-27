@@ -322,26 +322,6 @@ class WADFile:
         s.state = 'inited'
         s.maps = []
 
-    def read(s):
-        assert s.state == 'inited'
-        s.state = 'header'
-
-        header = s.f.read(4)
-        assert header == 'IWAD' or header == 'PWAD'
-
-        s.num_lumps = s.read_long()
-        if s.verbose: print 'num lumps: ' + str(s.num_lumps)
-        s.dir_offset = s.read_long()
-        if s.verbose: print 'directory offset: ' + str(s.dir_offset)
-        s.lumps_offset = s.f.tell()
-        if s.verbose: print 'lumps offset: ' + str(s.lumps_offset)
-        s.f.seek(s.dir_offset)
-        s.read_directory()
-        s.f.seek(s.lumps_offset)
-        rv = WADContent()
-        s.read_lumps(rv)
-        return rv
-
     def read_long(s):
         return struct.unpack('i', s.f.read(4))[0]
 
@@ -367,13 +347,6 @@ class WADFile:
         while len(final) < 8: final += '\0'
         s.f.write(final)
 
-    def read_directory(s):
-        assert s.state == 'header'
-        s.state = 'directory'
-        infosize = LumpInfo().get_size()
-        end = s.f.tell() + s.num_lumps * infosize
-        s.directory = s.read_array_lump(end, LumpInfo)
-
     def read_array_lump(s, lumpend, clazz):
         size = clazz().get_size()
         assert (lumpend - s.f.tell()) % size == 0
@@ -390,40 +363,6 @@ class WADFile:
 
     def is_map_start_lump(s, name):
         return name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M')
-
-    def read_lumps(s, content):
-
-        _map = None
-        
-        for entry in s.directory:
-            s.f.seek(entry.filepos)
-            lumpend = s.f.tell() + entry.size
-            name = entry.name
-
-            if s.is_map_start_lump(name):
-                assert entry.size == 0
-                print 'reading map ' + entry.name
-                _map = Map(entry.name)
-                content.maps += [_map]
-
-            elif _map and _map.handle_lump(s, entry, lumpend):
-                # no need to do anything - it handled it
-                pass
-                    
-            elif name == 'ENDOOM':
-                # sanity check
-                assert entry.size == 4000
-                content.end_msg = s.f.read(4000)
-
-            else:
-                # ignore this lump
-                pass
-
-# print 'ENDOOM:\n' + msg
-
-        print 'finished reading lumps'
-        print 'curr pos: %d, dir start pos: %d' % (s.f.tell(), s.dir_offset)
-        print 'read %d maps' % len(content.maps)
 
 def read_wad(path):
     """ This will yield (lumpinfo, wadfile) tuples for each lump """
