@@ -6,12 +6,54 @@ import random
 
 import dero_config
 
-"""
-    lumps:
-        read, write, 
+class WADFile:
+    """ Low-level operations for read/writing lumps, for reading and writing wads """
 
-    wadio take lump array, or handlers
-        """
+    def __init__(s, f):
+        s.f = f
+
+    def read_long(s):
+        return struct.unpack('i', s.f.read(4))[0]
+
+    def write_long(s, val):
+        return s.f.write( struct.pack('i', val) )
+
+    def read_short(s):
+        return struct.unpack('h', s.f.read(2))[0]
+
+    def write_short(s, val):
+        return s.f.write( struct.pack('h', val) )
+
+    def read_string8(s):
+        raw = s.f.read(8)
+        term = raw.find('\0')
+        if term == -1:
+            return raw
+        else:
+            return raw[0:term]
+
+    def write_string8(s, val):
+        final = val
+        while len(final) < 8: final += '\0'
+        s.f.write(final)
+
+    def read_array_lump(s, lumpend, clazz):
+        size = clazz().get_size()
+        assert (lumpend - s.f.tell()) % size == 0
+        rv = []
+        while s.f.tell() < lumpend:
+            block = clazz()
+            block.read(s)
+            rv += [block]
+        return rv
+
+    def write_array_lump(s, array):
+        for block in array:
+            block.write(s)
+
+    def is_map_start_lump(s, name):
+        return name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M')
+
 
 class SimpleStruct:
 
@@ -215,6 +257,14 @@ class Map:
             uniqs.add(sd.midtex)
         return uniqs
 
+    LUMP_TO_ELEMENT_CLASS = {
+        'THINGS' : Thing,
+        'VERTEXES' : Vertex,
+        'LINEDEFS' : LineDef,
+        'SIDEDEFS' : SideDef,
+        'SECTORS' : Sector,
+    }
+
     def handle_lump(s, io, lump, lumpend):
         name = lump.name
         if name == 'THINGS':
@@ -240,6 +290,63 @@ class Map:
         ArrayLump('SIDEDEFS', s.sidedefs),
         ArrayLump('SECTORS', s.sectors),
         ]
+
+class WADContent:
+    """ Should contain all essential contents of a WAD """
+
+    def __init__(s):
+        s.maps = []
+        s.other_lumps = []
+        s.end_msg = None
+
+    def read_lumps( s, directory, wad ):
+        _map = None
+        
+        for entry in directory:
+            wad.f.seek(entry.filepos)
+            lumpend = wad.f.tell() + entry.size
+            name = entry.name
+
+            if wad.is_map_start_lump(name):
+                assert entry.size == 0
+                print 'reading map ' + entry.name
+                _map = Map(entry.name)
+                s.maps += [_map]
+
+            elif _map and _map.handle_lump(wad, entry, lumpend):
+                # no need to do anything - it handled it
+                pass
+                    
+            elif name == 'ENDOOM':
+                # sanity check
+                assert entry.size == 4000
+                s.end_msg = wad.f.read(4000)
+
+            else:
+                # ignore this lump
+                pass
+
+def read_wad(path):
+    """ This will yield (lumpinfo, wadfile) tuples for each lump """
+    with open(path, 'rb') as f:
+        wad = WADFile(f)
+
+        header = f.read(4)
+        num_lumps = wad.read_long()
+        dir_offset = wad.read_long()
+
+        assert header == 'IWAD' or header == 'PWAD'
+
+        # read directory
+        f.seek(dir_offset)
+        infosize = LumpInfo().get_size()
+        end = f.tell() + num_lumps * infosize
+        directory = wad.read_array_lump(end, LumpInfo)
+
+        # lumps
+        rv = WADContent()
+        rv.read_lumps( directory, wad )
+        return rv
 
 def write_wad(path, header, lumps):
     with open(path, 'wb') as fout:
@@ -278,113 +385,6 @@ def write_wad(path, header, lumps):
         assert lumpstart == dir_offset
         io.write_array_lump(directory)
 
-class WADContent:
-    """ Should contain all essential contents of a WAD """
-
-    def __init__(s):
-        s.maps = []
-        s.other_lumps = []
-        s.end_msg = None
-
-    def read_lumps( s, directory, wad ):
-        _map = None
-        
-        for entry in directory:
-            wad.f.seek(entry.filepos)
-            lumpend = wad.f.tell() + entry.size
-            name = entry.name
-
-            if wad.is_map_start_lump(name):
-                assert entry.size == 0
-                print 'reading map ' + entry.name
-                _map = Map(entry.name)
-                s.maps += [_map]
-
-            elif _map and _map.handle_lump(wad, entry, lumpend):
-                # no need to do anything - it handled it
-                pass
-                    
-            elif name == 'ENDOOM':
-                # sanity check
-                assert entry.size == 4000
-                s.end_msg = wad.f.read(4000)
-
-            else:
-                # ignore this lump
-                pass
-
-class WADFile:
-    """ Low-level operations for read/writing lumps, for reading and writing wads """
-
-    def __init__(s, f):
-        s.f = f
-        s.verbose = False
-        s.state = 'inited'
-        s.maps = []
-
-    def read_long(s):
-        return struct.unpack('i', s.f.read(4))[0]
-
-    def write_long(s, val):
-        return s.f.write( struct.pack('i', val) )
-
-    def read_short(s):
-        return struct.unpack('h', s.f.read(2))[0]
-
-    def write_short(s, val):
-        return s.f.write( struct.pack('h', val) )
-
-    def read_string8(s):
-        raw = s.f.read(8)
-        term = raw.find('\0')
-        if term == -1:
-            return raw
-        else:
-            return raw[0:term]
-
-    def write_string8(s, val):
-        final = val
-        while len(final) < 8: final += '\0'
-        s.f.write(final)
-
-    def read_array_lump(s, lumpend, clazz):
-        size = clazz().get_size()
-        assert (lumpend - s.f.tell()) % size == 0
-        rv = []
-        while s.f.tell() < lumpend:
-            block = clazz()
-            block.read(s)
-            rv += [block]
-        return rv
-
-    def write_array_lump(s, array):
-        for block in array:
-            block.write(s)
-
-    def is_map_start_lump(s, name):
-        return name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M')
-
-def read_wad(path):
-    """ This will yield (lumpinfo, wadfile) tuples for each lump """
-    with open(path, 'rb') as f:
-        wad = WADFile(f)
-
-        header = f.read(4)
-        num_lumps = wad.read_long()
-        dir_offset = wad.read_long()
-
-        assert header == 'IWAD' or header == 'PWAD'
-
-        # read directory
-        f.seek(dir_offset)
-        infosize = LumpInfo().get_size()
-        end = f.tell() + num_lumps * infosize
-        directory = wad.read_array_lump(end, LumpInfo)
-
-        # lumps
-        rv = WADContent()
-        rv.read_lumps( directory, wad )
-        return rv
 
 def save_map_png(_map, fname):
     pylab.figure()
@@ -392,7 +392,7 @@ def save_map_png(_map, fname):
     _map.plot()
     pylab.grid(True)
     pylab.savefig(fname)
-    print 'done plotting'
+    print 'done plotting to %s' % fname
 
 def test_doom1_wad():
     path = dero_config.DOOM1_WAD_PATH
@@ -421,6 +421,7 @@ def test_doom1_wad():
     assert _map2.name == _map.name
     assert len(_map2.verts) == len(_map.verts)
     assert len(_map2.linedefs) == len(_map.linedefs)
+    assert len(_map2.things) == 1
 
     # draw maps for comparison
     save_map_png( _map, 'expected.png')
