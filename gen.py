@@ -8,7 +8,8 @@ from scipy.cluster.vq import kmeans
 import sys
 from planar import Vec2
 from utils import *
-
+import dero_config
+import wad
 
 def testBasic():
     g = Grid2(80,80,' ')
@@ -271,12 +272,12 @@ def method2(L, numRegions):
     seed_spread(space_vals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
-    print 'computing space adj'
-    adj_dict = G.value_adjacency()
+    print 'computing doors'
+    door_dict = G.value_adjacency()
 
     # create graph rep
     adj_graph = nx.Graph()
-    for (a,b) in adj_dict:
+    for (a,b) in door_dict:
         if a == ' ':
             continue
         adj_graph.add_edge(a,b)
@@ -308,7 +309,7 @@ def method2(L, numRegions):
 
 # DEFINITION: a lock node means, to get TO IT, requires a key.
 
-    gates = []
+    locks = []
     keys = []
 
     def on_key(k):
@@ -317,9 +318,9 @@ def method2(L, numRegions):
         labels[k] += ' K%d' % len(keys)
 
     def on_gate(g):
-        gates.append(g)
+        locks.append(g)
         colors[g] = 'r'
-        labels[g] += ' G%d' % len(gates)
+        labels[g] += ' G%d' % len(locks)
 
         for u in yield_dfs(space_tree, g, set()):
             colors[u] = 'r'
@@ -331,24 +332,23 @@ def method2(L, numRegions):
         pylab.xlim([0, L])
         pylab.ylim([0, L])
         draw_labels(space_tree)
-        pylab.savefig('gates%d.png' % len(gates))
+        pylab.savefig('locks%d.png' % len(locks))
 
     write_state_png()
 
+    print 'start needy squidi..'
     for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_node, exit_node, numRegions/3):
-        print key, lock
         on_key(key)
         on_gate(lock)
         write_state_png()
 
-    pylab.figure()
-    G.show_image()
-    # write adjacency positions too, ie. the doors from one space to the next
-    for (a,b) in adj_graph.edges():
-        (u,v) = adj_dict[asc(a,b)]
-        pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
-    pylab.savefig('grid.png')
+    # only keep the doors in the tree
+    # we can re-add some of these later too, if they don't break puzzle structure
+    reduced_doors = {}
+    for (a,b) in space_tree.edges():
+        reduced_doors[(a,b)] = door_dict[asc(a,b)]
 
+    return (G, locks, keys, space_tree, reduced_doors)
 
 def v_case():
     T = nx.DiGraph()
@@ -364,7 +364,7 @@ def v_case():
 def test_polygonate():
     G = Grid2(3,3,0)
     G.set(1,1,1)
-    polys = polygonate(G, lambda x : x == 0)
+    polys = polygonate(G, lambda x : x == 0, False, None)
     colors = 'rgbky'
     ci = 0
     for poly in polys:
@@ -390,7 +390,7 @@ def test_polygonate_2():
     G.set(3,2,1)
     G.set(3,3,1)
     G.set(4,3,1)
-    polys = polygonate(G, lambda x : x == 1)
+    polys = polygonate(G, lambda x : x == 1, False, None)
     draw_polys(polys)
     pylab.xlim([-1, G.W+1])
     pylab.ylim([-1, G.H+1])
@@ -410,10 +410,10 @@ def test_polygonate_perlin():
         val = noise.pnoise2(x, y)
         G.pset(u, val)
 
-    polys = polygonate(G, lambda x : x > -0.1 and x < 0.2)
+    polys = polygonate(G, lambda x : x > -0.1 and x < 0.2, False, None)
 
     for i in range(len(polys)):
-        polys[i] = simplify_poly(polys[i], 0.0)
+        polys[i] = linear_simplify_poly(polys[i])
 
     draw_polys(polys)
     marx = G.W*0.1
@@ -436,6 +436,47 @@ def test_left_vert():
     plot_poly( poly, '.-' )
     pylab.show()
 
+def synth_map(G, doors):
+# refwad = wad.read_wad(dero_config.DOOM1_WAD_PATH)
+
+    spaces = set([a for (a,b) in doors] + [b for (a,b) in doors])
+
+    for space in spaces:
+        def on_edge(u, v, polyid, edgeid):
+            su = G.pget(u)
+            sv = G.pget(v)
+            door = asc(su, sv)
+            if door in doors:
+                (du,dv) = doors[door]
+                if (du == u and dv == v) or (du == v and dv == u):
+                    print 'door', str(door) + ' at edge %d' % (edgeid), du, dv
+
+        print '--- space ' + space
+        polys = polygonate(G, lambda x : x == space, True, on_edge)
+        for i in range(len(polys)):
+            polys[i] = linear_simplify_poly(polys[i])
+        pylab.figure()
+        draw_polys(polys)
+        pylab.xlim([-1, G.W+1])
+        pylab.ylim([-1, G.H+1])
+        pylab.grid(True)
+        pylab.savefig('space-%s-poly.png' % space)
+
 # test_polygonate_2()
 # test_polygonate_perlin()
-method2(int(sys.argv[1]), int(sys.argv[2]))
+if __name__ == '__main__':
+    L = int(sys.argv[1])
+    (G, locks, keys, space_tree, doors) = method2(L, int(sys.argv[2]))
+
+    print 'draw grid'
+    pylab.figure()
+    G.show_image()
+    # write adjacency positions too, ie. the doors from one space to the next
+    for (a,b) in doors:
+        (u,v) = doors[(a,b)]
+        pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
+    pylab.savefig('grid.png')
+
+    # synth playable wad
+    synth_map(G, doors)
+

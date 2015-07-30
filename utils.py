@@ -8,6 +8,7 @@ from planar import Vec2
 from Queue import *
 import sys
 from euclid import *
+import wad
 
 
 def char_times(c, x):
@@ -129,8 +130,8 @@ class Grid2:
     def pset(self,p,value):
         self.grid[self.W*p.y+p.x] = value
 
-    def write(self):
-# first compute widest string
+    def printself(self):
+        # first compute widest string
         maxlen = 0
         for (u,x) in self.piter():
             maxlen = max( len(str(x)), maxlen )
@@ -222,11 +223,9 @@ class Grid2:
             G.set(x, H-1, val)
 
     def cells_with_values(self, valueset):
-        rv = []
         for (p,x) in self.piter():
             if x in valueset:
-                rv += [p]
-        return rv
+                yield p
 
     def cells_with_value(self, value):
         for (p,x) in self.piter():
@@ -480,7 +479,7 @@ def seed_spread(seedvals, sews, G, freevalue, max_spreads):
             for (v,val) in G.nbors4(u):
                 print v, val
             print front.array
-            G.write()
+            G.printself()
             sys.exit(1)
 
     return spreads
@@ -588,14 +587,17 @@ def left_vert(u, edge):
 def right_vert(u, edge):
     return turned_center_offset(u, Vector2(0.5, -0.5), edge)
 
-def polygonate(G, is_in_val):
+def polygonate(G, is_in_val, oob_is_inside, on_edge):
     polys = []
     edge_done_grid = Grid2(G.W, G.H, 0)
 
     def is_in(u):
-        return G.check(u) and is_in_val(G.pget(u))
+        if not G.check(u):
+            return oob_is_inside
+        else:
+            return is_in_val(G.pget(u))
 
-    def trace_polygon(u, edge, poly):
+    def trace_polygon(u, edge, poly, poly_id):
         while True:
             dones = edge_done_grid.pget(u)
             if (dones & (1 << edge)) > 0:
@@ -604,6 +606,7 @@ def polygonate(G, is_in_val):
 
             # the last one in the chain will take of our left-vert, so don't worry about it
             poly += [ right_vert(u, edge) ]
+            if on_edge: on_edge(u, u+EDGE_TO_NORM[edge], poly_id, len(poly)-1)
 # print u, edge
 # print poly
             new_done = dones | (1<<edge)
@@ -611,7 +614,6 @@ def polygonate(G, is_in_val):
 
             v_right = u + Int2(0,-1).turn(edge)
             if not is_in(v_right):
-                u = u
                 edge = (edge-1)%4
             else:
                 v_right_fwd = u + Int2(1,-1).turn(edge)
@@ -634,8 +636,7 @@ def polygonate(G, is_in_val):
                 continue
             poly = []
             polys += [poly]
-            print u, edge
-            trace_polygon(u, edge, poly)
+            trace_polygon(u, edge, poly, len(polys)-1)
 
     return polys
 # return TEST_POLYS
@@ -648,7 +649,8 @@ def plot_poly(verts, style):
 def get_wrap(array, i):
     return array[ i % len(array) ]
 
-def simplify_poly(poly, tol):
+def linear_simplify_poly(poly):
+    """ A pretty efficient, linear simplification. Is NOT optimal by any means, but probably takes care of 90% of simplifications that should be done """
     if len(poly) < 4:
         return poly
 

@@ -95,6 +95,32 @@ class SimpleStruct:
             elif field[1] == 'string8':
                 setattr(s, field[0], '')
 
+    def fill(s, values):
+        assert len(values) == len(s.get_fields())
+        for i in range(len(values)):
+            field = s.get_fields()[i]
+            val = values[i]
+            if field[1] == 'short':
+                assert type(val) == int
+                setattr(s, field[0], val)
+            elif field[1] == 'int':
+                assert type(val) == int
+                setattr(s, field[0], val)
+            elif field[1] == 'string8':
+                assert type(val) == str
+                setattr(s, field[0], val)
+        return s
+
+    def copy(s, src):
+        for field in s.get_fields():
+            setattr(s, field[0], getattr(src, field[0]))
+
+    def __repr__(s):
+        rv = ''
+        for field in s.get_fields():
+            rv += field[0] + ':' + str(getattr(s,field[0])) + ','
+        return rv
+
 class LumpInfo(SimpleStruct):
 
     FIELDS = [
@@ -157,11 +183,18 @@ class LineDef(SimpleStruct):
     ('flags', 'short'),
     ('function', 'short'),
     ('tag', 'short'),
-    ('sd_left', 'short'),
     ('sd_right', 'short'),
+    ('sd_left', 'short'),
     ]
 
-    def get_fields(s): return LineDef.FIELDS
+    def get_fields(s):
+        return LineDef.FIELDS
+
+    def set_flag(s, flag):
+        assert flag in LineDef.FLAGBIT
+        n = LineDef.FLAGBIT[flag]
+        s.flags |= 1 << n
+        return s
 
 class SideDef(SimpleStruct):
 
@@ -201,6 +234,8 @@ class ArrayLump:
     def __init__(s, name, array):
         s.name = name
         s.array = array
+        assert type(s.array) == list
+        assert len(s.array) > 0
 
     def write(s, io):
         io.write_array_lump(s.array)
@@ -281,7 +316,7 @@ class Map:
             return False
         return True
 
-    def append_lumps(s, lumps):
+    def append_lumps_to(s, lumps):
         lumps += [
         DummyLump(s.name),
         ArrayLump('THINGS', s.things),
@@ -290,6 +325,10 @@ class Map:
         ArrayLump('SIDEDEFS', s.sidedefs),
         ArrayLump('SECTORS', s.sectors),
         ]
+
+    def add_player_start(s, x, y, angle):
+        t = Thing().fill([x, y, angle, 1, 0])
+        s.things += [t]
 
 class WADContent:
     """ Should contain all essential contents of a WAD """
@@ -367,7 +406,7 @@ def write_wad(path, header, lumps):
         print 'dir off set = %d' % dir_offset
 
         for lump in lumps:
-            print 'start = %d, tell = %d' % (lumpstart, fout.tell())
+            # print 'start = %d, tell = %d' % (lumpstart, fout.tell())
             assert lumpstart == fout.tell()
             lump.write(io)
 
@@ -402,12 +441,23 @@ def test_doom1_wad():
     assert content.end_msg
     _map = content.maps[0]
 
+    # create square map
+    m3 = create_square_map(_map)
+    lumps = []
+    m3.append_lumps_to(lumps)
+    write_wad('square.wad', 'PWAD', lumps)
+    dero_config.build_wad( 'square.wad', 'square-built.wad' )
+
     # filter out all things except player start
     _map.things = [t for t in _map.things if t.type == 1]
 
+    # print out all unique LD functions
+    funcs = set([ ld.function for ld in _map.linedefs] )
+    print 'unique functions: ' + str(funcs)
+
     # write the map back
     lumps = []
-    _map.append_lumps(lumps)
+    _map.append_lumps_to(lumps)
     write_wad('%s.wad' % _map.name, 'PWAD', lumps)
 
     # run bsp on it
@@ -426,6 +476,52 @@ def test_doom1_wad():
     # draw maps for comparison
     save_map_png( _map, 'expected.png')
     save_map_png( _map2, 'actual.png')
+
+def create_square_map(ref):
+
+    L = 200
+    rv = Map('E1M1')
+    rv.add_player_start(L/2,L/2,0)
+    rv.verts = [
+        Vertex().fill([0,0]),
+        Vertex().fill([0,L]),
+        Vertex().fill([L,L]),
+        Vertex().fill([L,0]),
+        ]
+
+    random.seed(42)
+
+    refsec = random.choice([s for s in ref.sectors if s.floor_pic and s.ceil_pic])
+    rv.sectors = [
+        Sector().fill([0, 100,  refsec.floor_pic, refsec.ceil_pic, 128, 0, 0])
+    ]
+
+    exit_lds = [ld for ld in ref.linedefs if ld.function == 11]
+    exit_sd = ref.sidedefs[ exit_lds[0].sd_right ]
+    print 'exit ld = ', exit_lds[0]
+    print 'exit sd = ', exit_sd
+    refsd = random.choice(ref.sidedefs)
+
+    rv.sidedefs = [
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, exit_sd.midtex, 0]),
+        ]
+
+    rv.linedefs = [
+        LineDef().fill([0, 1,   0, 0, 0,    0, -1]).set_flag('Impassible'),
+        LineDef().fill([1, 2,   0, 0, 0,    1, -1]).set_flag('Impassible'),
+        LineDef().fill([2, 3,   0, 0, 0,    2, -1]).set_flag('Impassible'),
+        LineDef().fill([2, 3,   0, 0, 0,    2, -1]).set_flag('Impassible'),
+        LineDef().fill([3, 0,   0, 11, 0,    3, -1]).set_flag('Impassible'),
+        ]
+
+    print 'FOO'
+    print str(exit_sd)
+
+
+    return rv
 
 if __name__ == "__main__":
     test_doom1_wad()
