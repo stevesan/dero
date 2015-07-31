@@ -164,6 +164,9 @@ class Sector(SimpleStruct):
 
     def get_fields(s): return Sector.FIELDS
 
+    def has_all_textures(s):
+        return len(s.floor_pic) > 1 and len(s.ceil_pic) > 1
+
 class LineDef(SimpleStruct):
 
     FLAGBIT = {
@@ -214,6 +217,9 @@ class SideDef(SimpleStruct):
     ]
 
     def get_fields(s): return SideDef.FIELDS
+
+    def has_all_textures(s):
+        return len(s.uppertex) > 1 and len(s.midtex) > 1 and len(s.lowertex)> 1
 
 class DummyLump():
     """ Used for directory markers, like levels """
@@ -499,34 +505,60 @@ def create_square_map(ref):
         Vertex().fill([0,L]),
         Vertex().fill([L,L]),
         Vertex().fill([L,0]),
+        Vertex().fill([0,2*L]),
+        Vertex().fill([L,2*L]),
         ]
 
     random.seed(42)
 
-    refsec = random.choice([s for s in ref.sectors if s.floor_pic and s.ceil_pic])
+    valid_sec_ids = [sid for sid in range(len(ref.sectors)) if ref.sectors[sid].has_all_textures()]
+    ref_sec_id = random.choice(valid_sec_ids)
+    ref_sec_id2 = random.choice(valid_sec_ids)
+    refsec = ref.sectors[ref_sec_id]
+    refsec2 = ref.sectors[ref_sec_id2]
+
     rv.sectors = [
-        Sector().fill([0, 100,  refsec.floor_pic, refsec.ceil_pic, 128, 0, 0])
+        Sector().fill([0, 100,  refsec.floor_pic, refsec.ceil_pic, 128, 0, 0]),
+        Sector().fill([16, 82,  refsec2.floor_pic, refsec2.ceil_pic, 128, 0, 0]),
     ]
 
     exit_lds = [ld for ld in ref.linedefs if ld.function == 11]
     exit_sd = ref.sidedefs[ exit_lds[0].sd_right ]
     print 'exit ld = ', exit_lds[0]
     print 'exit sd = ', exit_sd
-    refsd = random.choice(ref.sidedefs)
+
+    refsd = random.choice([sd for sd in ref.sidedefs if sd.has_all_textures()])
+    refsd2 = random.choice([sd for sd in ref.sidedefs if sd.has_all_textures()])
+    print 'refsd', refsd
+    print 'refsd2', refsd2
 
     rv.sidedefs = [
         SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
         SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
         SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
-        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, exit_sd.midtex, 0]),
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, '-', 0]),
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, '-', 1]),
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]),
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]),
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]),
         ]
 
+    """
+    4   5
+
+    1   2
+
+    0   3
+    """
+
     rv.linedefs = [
-        LineDef().fill([0, 1,   0, 0, 0,    0, -1]).set_flag('Impassible'),
-        LineDef().fill([1, 2,   0, 0, 0,    1, -1]).set_flag('Impassible'),
-        LineDef().fill([2, 3,   0, 0, 0,    2, -1]).set_flag('Impassible'),
-        LineDef().fill([2, 3,   0, 0, 0,    2, -1]).set_flag('Impassible'),
-        LineDef().fill([3, 0,   0, 11, 0,    3, -1]).set_flag('Impassible'),
+        LineDef().fill([2, 3,   0, 0, 0,    0, -1]).set_flag('Impassible'),
+        LineDef().fill([3, 0,   0, 0, 0,    1, -1]).set_flag('Impassible'),
+        LineDef().fill([0, 1,   0, 0, 0,    2, -1]).set_flag('Impassible'),
+        LineDef().fill([1, 2,   0, 0, 0,    3, 4]).set_flag('Impassible').clear_flag('Impassible').set_flag('Two-sided'),
+        LineDef().fill([1, 4,   0, 0, 0,    5, -1]).set_flag('Impassible'),
+        LineDef().fill([4, 5,   0, 0, 0,    6, -1]).set_flag('Impassible'),
+        LineDef().fill([5, 2,   0, 0, 0,    7, -1]).set_flag('Impassible'),
         ]
 
     print 'FOO'

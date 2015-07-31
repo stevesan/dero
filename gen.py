@@ -486,26 +486,25 @@ def synth_map(G, doors, mapname, scale, refwad):
         door_edges = set()
 
         def on_edge(u, v, polyid, edgeid):
-            su = G.pget(u)
-            sv = G.pget(v)
-            door = asc(su, sv)
+            assert polyid == 0
+            door = asc(G.pget(u), G.pget(v))
             if door in doors:
-                (du,dv) = doors[door]
-                if unordered_equal((du, dv), (u,v)):
-                    print 'door', str(door) + ' at edge %d' % (edgeid), du, dv
-                    assert polyid == 0
+                if unordered_equal(doors[door], (u,v)):
+                    print 'door', str(door) + ' at edge %d' % (edgeid), u, v
                     door_edges.add(edgeid)
 
         polys = polygonate(G, lambda x : x == space, True, on_edge)
         assert len(polys) == 1
         poly = polys[0]
 # poly = linear_simplify_poly(poly)
+        """
         pylab.figure()
         draw_polys([poly])
         pylab.xlim([-1, G.W+1])
         pylab.ylim([-1, G.H+1])
         pylab.grid(True)
         pylab.savefig('space-%s-poly.png' % space)
+        """
 
         lineid_base = len(rv.linedefs)
         sdid_base = len(rv.sidedefs)
@@ -517,6 +516,7 @@ def synth_map(G, doors, mapname, scale, refwad):
         for sdid in range(sdid_base, len(rv.sidedefs)):
             rv.sidedefs[sdid].midtex = walltex
 
+        # make doors where they should be
         doortex = random.choice([tex for tex in walltexs if 'DOOR' in tex])
         print 'door tex = %s' % doortex
         for did in door_edges:
@@ -559,12 +559,12 @@ if __name__ == '__main__':
     m.add_player_start( int((startpos.x+0.5)*scale), int((startpos.y+0.5)*scale), 0 )
     lumps = []
     m.append_lumps_to(lumps)
-    wad.save('gen.wad', 'PWAD', lumps)
+    wad.save('source.wad', 'PWAD', lumps)
 # wad.save_map_png( m, 'expected.png' )
-    dero_config.build_wad( 'gen.wad', 'gen-built.wad' )
+    dero_config.build_wad( 'source.wad', 'built-playable.wad' )
 
     # readback
-    actwad = wad.load('gen.wad')
+    actwad = wad.load('source.wad')
 # wad.save_map_png( actwad.maps[0], 'actual.png')
 
 
