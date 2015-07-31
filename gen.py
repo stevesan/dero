@@ -459,6 +459,7 @@ def add_poly_to_map(m, poly, uniform_scale, translation):
         assert v0 < len(m.verts)
         assert v1 < len(m.verts)
         sd_right = first_sid + vertnum
+        assert sd_right == len(m.sidedefs)-1
         ld = wad.LineDef().fill([v0, v1,    0, 0, 0,    sd_right, -1]).set_flag('Impassible')
         lineid = vertnum
         m.linedefs.append(ld)
@@ -520,11 +521,17 @@ def synth_map(G, doors, mapname, scale, refwad):
         print 'door tex = %s' % doortex
         for did in door_edges:
             ld = rv.linedefs[lineid_base + did]
+            ld.clear_flag('Impassible')
             sd = rv.sidedefs[ld.sd_right]
             sd.midtex = doortex
             v0 = rv.verts[ld.vert0]
+            v1 = rv.verts[ld.vert1]
 
-            print 'made door at %d,%d' % (v0.x, v0.y)
+            print 'made door at %d,%d -> %d,%d' % (v0.x*1.0/scale, v0.y*1.0/scale,
+                    v1.x*1.0/scale, v1.y*1.0/scale)
+
+        assert len(rv.linedefs) == lineid_base + len(poly)
+        assert len(rv.sidedefs) == sdid_base + len(poly)
 
     return rv
 

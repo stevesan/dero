@@ -615,7 +615,7 @@ def polygonate(G, is_in_val, oob_is_inside, on_edge):
 
             # the last one in the chain will take of our left-vert, so don't worry about it
             poly += [ right_vert(u, edge) ]
-            if on_edge: on_edge(u, u+EDGE_TO_NORM[edge], poly_id, len(poly)-1)
+            if on_edge: on_edge(u, u+EDGE_TO_NORM[edge], poly_id, len(poly)-2)
 # print u, edge
 # print poly
             new_done = dones | (1<<edge)
