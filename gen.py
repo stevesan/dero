@@ -348,7 +348,7 @@ def method2(L, numRegions):
     for (a,b) in space_tree.edges():
         reduced_doors[(a,b)] = door_dict[asc(a,b)]
 
-    return (G, locks, keys, space_tree, reduced_doors)
+    return (G, locks, keys, space_tree, reduced_doors, spawn_node)
 
 def v_case():
     T = nx.DiGraph()
@@ -423,7 +423,6 @@ def test_polygonate_perlin():
     pylab.grid(True)
     pylab.show()
 
-
 def test_quat_turns():
     print Int2(1,0).turn(0)
     print Int2(1,0).turn(1)
@@ -436,37 +435,104 @@ def test_left_vert():
     plot_poly( poly, '.-' )
     pylab.show()
 
-def synth_map(G, doors):
-# refwad = wad.read_wad(dero_config.DOOM1_WAD_PATH)
+def add_poly_to_map(m, poly, uniform_scale, translation):
+    assert type(translation) == Vector2
+    nverts = len(poly)
+    first_vid = len(m.verts)
+    first_lid = len(m.linedefs)
+    first_sid = len(m.sidedefs)
+    secid = len(m.sectors)
+
+    for vert in poly:
+        vert = Int2.floor( uniform_scale*vert + translation )
+        m.verts.append( wad.Vertex().fill([vert.x, vert.y]) )
+
+    sector = wad.Sector().fill([0, 100, '-', '-', 128, 0, 0])
+    m.sectors.append( sector )
+
+    for vertnum in range(len(poly)):
+        sd = wad.SideDef().fill([0, 0, '-', '-', '-', secid])
+        m.sidedefs.append(sd)
+
+        v0 = first_vid + (vertnum % nverts)
+        v1 = first_vid + ((vertnum+1) % nverts)
+        assert v0 < len(m.verts)
+        assert v1 < len(m.verts)
+        sd_right = first_sid + vertnum
+        ld = wad.LineDef().fill([v0, v1,    0, 0, 0,    sd_right, -1]).set_flag('Impassible')
+        lineid = vertnum
+        m.linedefs.append(ld)
+
+    return sector
+
+def synth_map(G, doors, mapname, scale, refwad):
+    refsec = random.choice([s for s in refwad.maps[0].sectors if s.floor_pic and s.ceil_pic])
+
+    floortexs = set([sec.floor_pic for m in refwad.maps for sec in m.sectors if sec.floor_pic])
+    ceiltexs = set([sec.ceil_pic for m in refwad.maps for sec in m.sectors if sec.ceil_pic])
+    walltexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if sd.midtex])
+
+    print '----------------------------------------'
+    print floortexs
+    print ceiltexs
 
     spaces = set([a for (a,b) in doors] + [b for (a,b) in doors])
+    rv = wad.Map(mapname)
 
     for space in spaces:
+        print '--- space ' + space
+
+        door_edges = set()
+
         def on_edge(u, v, polyid, edgeid):
             su = G.pget(u)
             sv = G.pget(v)
             door = asc(su, sv)
             if door in doors:
                 (du,dv) = doors[door]
-                if (du == u and dv == v) or (du == v and dv == u):
+                if unordered_equal((du, dv), (u,v)):
                     print 'door', str(door) + ' at edge %d' % (edgeid), du, dv
+                    assert polyid == 0
+                    door_edges.add(edgeid)
 
-        print '--- space ' + space
         polys = polygonate(G, lambda x : x == space, True, on_edge)
-        for i in range(len(polys)):
-            polys[i] = linear_simplify_poly(polys[i])
+        assert len(polys) == 1
+        poly = polys[0]
+# poly = linear_simplify_poly(poly)
         pylab.figure()
-        draw_polys(polys)
+        draw_polys([poly])
         pylab.xlim([-1, G.W+1])
         pylab.ylim([-1, G.H+1])
         pylab.grid(True)
         pylab.savefig('space-%s-poly.png' % space)
 
+        lineid_base = len(rv.linedefs)
+        sdid_base = len(rv.sidedefs)
+        sector = add_poly_to_map( rv, poly, scale, Vector2(0,0) )
+        sector.floor_pic = random.sample(floortexs,1)[0]
+        sector.ceil_pic = random.sample(ceiltexs,1)[0]
+
+        walltex = random.sample(walltexs,1)[0]
+        for sdid in range(sdid_base, len(rv.sidedefs)):
+            rv.sidedefs[sdid].midtex = walltex
+
+        doortex = random.choice([tex for tex in walltexs if 'DOOR' in tex])
+        print 'door tex = %s' % doortex
+        for did in door_edges:
+            ld = rv.linedefs[lineid_base + did]
+            sd = rv.sidedefs[ld.sd_right]
+            sd.midtex = doortex
+            v0 = rv.verts[ld.vert0]
+
+            print 'made door at %d,%d' % (v0.x, v0.y)
+
+    return rv
+
 # test_polygonate_2()
 # test_polygonate_perlin()
 if __name__ == '__main__':
     L = int(sys.argv[1])
-    (G, locks, keys, space_tree, doors) = method2(L, int(sys.argv[2]))
+    (G, locks, keys, space_tree, doors, spawn_node) = method2(L, int(sys.argv[2]))
 
     print 'draw grid'
     pylab.figure()
@@ -478,5 +544,20 @@ if __name__ == '__main__':
     pylab.savefig('grid.png')
 
     # synth playable wad
-    synth_map(G, doors)
+    refwad = wad.load(dero_config.DOOM1_WAD_PATH)
+    scale = 4096/L
+    m = synth_map(G, doors, 'E1M1', scale, refwad)
+    # add player start
+    startpos = random.choice([c for c in G.cells_with_value(spawn_node)])
+    m.add_player_start( int((startpos.x+0.5)*scale), int((startpos.y+0.5)*scale), 0 )
+    lumps = []
+    m.append_lumps_to(lumps)
+    wad.save('gen.wad', 'PWAD', lumps)
+# wad.save_map_png( m, 'expected.png' )
+    dero_config.build_wad( 'gen.wad', 'gen-built.wad' )
+
+    # readback
+    actwad = wad.load('gen.wad')
+# wad.save_map_png( actwad.maps[0], 'actual.png')
+
 

@@ -196,6 +196,12 @@ class LineDef(SimpleStruct):
         s.flags |= 1 << n
         return s
 
+    def clear_flag(s, flag):
+        assert flag in LineDef.FLAGBIT
+        n = LineDef.FLAGBIT[flag]
+        s.flags &= ~(1 << n)
+        return s
+
 class SideDef(SimpleStruct):
 
     FIELDS = [
@@ -235,7 +241,6 @@ class ArrayLump:
         s.name = name
         s.array = array
         assert type(s.array) == list
-        assert len(s.array) > 0
 
     def write(s, io):
         io.write_array_lump(s.array)
@@ -258,6 +263,13 @@ class Map:
         s.linedefs = []
         s.sidedefs = []
         s.sectors = []
+
+    def get_size(s):
+        xx = [v.x for v in s.verts]
+        yy = [v.y for v in s.verts]
+        dx = max(xx) - min(xx)
+        dy = max(yy) - min(yy)
+        return (dx, dy)
 
     def plot(s):
 
@@ -365,7 +377,7 @@ class WADContent:
                 # ignore this lump
                 pass
 
-def read_wad(path):
+def load(path):
     """ This will yield (lumpinfo, wadfile) tuples for each lump """
     with open(path, 'rb') as f:
         wad = WADFile(f)
@@ -387,7 +399,7 @@ def read_wad(path):
         rv.read_lumps( directory, wad )
         return rv
 
-def write_wad(path, header, lumps):
+def save(path, header, lumps):
     with open(path, 'wb') as fout:
         """ Writes an array of lumps to a *single* WAD file, handling proper directory setup, etc. """
         io = WADFile(fout)
@@ -435,7 +447,7 @@ def save_map_png(_map, fname):
 
 def test_doom1_wad():
     path = dero_config.DOOM1_WAD_PATH
-    content = read_wad(path)
+    content = load(path)
 
     assert len(content.maps) == 36
     assert content.end_msg
@@ -445,7 +457,7 @@ def test_doom1_wad():
     m3 = create_square_map(_map)
     lumps = []
     m3.append_lumps_to(lumps)
-    write_wad('square.wad', 'PWAD', lumps)
+    save('square.wad', 'PWAD', lumps)
     dero_config.build_wad( 'square.wad', 'square-built.wad' )
 
     # filter out all things except player start
@@ -458,13 +470,13 @@ def test_doom1_wad():
     # write the map back
     lumps = []
     _map.append_lumps_to(lumps)
-    write_wad('%s.wad' % _map.name, 'PWAD', lumps)
+    save('%s.wad' % _map.name, 'PWAD', lumps)
 
     # run bsp on it
     dero_config.build_wad( '%s.wad' % _map.name, 'test.wad' )
 
     # read it back
-    cont2 = read_wad('%s.wad' % _map.name)
+    cont2 = load('%s.wad' % _map.name)
     assert len(cont2.maps) == 1
     assert cont2.end_msg == None
     _map2 = cont2.maps[0]

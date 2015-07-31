@@ -20,6 +20,9 @@ def char_times(c, x):
 def add2(a,b):
     return (a[0]+b[0], a[1]+b[1])
 
+def unordered_equal(t0, t1):
+    return (t0[0] == t1[0] and t0[1] == t1[1]) or (t0[0] == t1[1] and t0[1] == t1[0])
+
 class IntMatrix2:
     def __init__(self, elems):
         """ elems should be row-major list of elements, ie. (e_00, e_01, e_10, e_11) """
@@ -106,6 +109,12 @@ class Int2:
     def turn(self, turns):
         """ CCW 90-degree multiple turn """
         return INT2_CCW_QUARTER_ROT_MATRICES[turns].transform(self)
+
+    @staticmethod
+    def floor(v2):
+        return Int2(
+                int(math.floor(v2.x)),
+                int(math.floor(v2.y)) )
 
 class Grid2:
     def __init__(self,_W, _H, default):
