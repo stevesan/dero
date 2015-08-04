@@ -535,9 +535,113 @@ def synth_map(G, doors, mapname, scale, refwad):
 
     return rv
 
+def grid2map(G, refwad, scale):
+    """ Converts a flat grid to a valid WAD with two-sided lines between all spaces """
+    val2sector = {}
+
+    # Grids holding other primitive info
+    verts = Grid2(G.W+2, G.H+2, None)
+    leftlines = Grid2(G.W+2, G.H+2, None)
+    botlines = Grid2(G.W+2, G.H+2, None)
+    rv = wad.Map('')
+    offset = Int2(1,1)
+
+    def get_line_gridcell( u, edge ):
+        if edge == 0:
+            return (leftlines, u+offset+Int2(1,0))
+        elif edge == 1:
+            return (botlines, u+offset+Int2(0,1))
+        elif edge == 2:
+            return (leftlines, u+offset)
+        else:
+            return (botlines, u+offset)
+
+    def get_linedef(u,edge):
+        (grid, ut) = get_line_gridcell(u, edge)
+        return grid.pget(ut)
+
+    def set_linedef(u, edge, ld):
+        lid = len(rv.linedefs)
+        rv.linedefs.append(ld)
+        (grid, ut) = get_line_gridcell(u, edge)
+        grid.pset( ut, lid )
+
+    def new_right_vert(u, edge):
+        c = Int2.floor(right_vert(u, edge) * scale)
+        print 'created right vert ' + str(c)
+        return wad.Vertex().fill([c.x, c.y])
+
+    def get_or_set_right_vert(u, edge):
+        if edge == 0:
+            ut = u + offset + Int2(1,0)
+        elif edge == 1:
+            ut = u + offset + Int2(1,1)
+        elif edge == 2:
+            ut = u + offset + Int2(0,1)
+        else:
+            ut = u + offset + Int2(0,0)
+
+        vid = verts.pget(ut)
+        if vid == None:
+            vert = new_right_vert(u, edge)
+            vid = len(rv.verts)
+            rv.verts.append(vert)
+            verts.pset( ut, vid )
+            
+        return vid
+
+    def get_or_set_left_vert(u, edge): return get_or_set_right_vert(u, (edge+1)%4)
+
+    for (u,p) in G.piter():
+        sector = None
+        if p in val2sector:
+            sector = val2sector[p]
+        else:
+            sector = wad.Sector().fill([0, 128,      '-', '-',       128, 0, 0])
+            val2sector[p] = sector
+            sid = len(rv.sectors)
+            rv.sectors.append(sector)
+
+        for edge in range(4):
+            print u, edge
+            v = u + EDGE_TO_NORM[edge]
+            if not G.check(v):
+                continue
+            q = G.pget(v)
+            if p != q:
+                # check if linedef here already
+                lid = get_linedef(u, edge)
+                if lid == None:
+                    # verts there?
+                    vid_left = get_or_set_left_vert(u, edge)
+                    vid_right = get_or_set_right_vert(u, edge)
+                    ld = wad.LineDef().fill([vid_left, vid_right, 0, 0, 0,   -1, -1])
+                    lid = set_linedef( u, edge, ld)
+                else:
+                    print 'reuse linedef %d' % lid
+                    ld = rv.linedefs[lid]
+
+    return rv
+
 # test_polygonate_2()
 # test_polygonate_perlin()
+
+def test_grid2map():
+    refwad = wad.load(dero_config.DOOM1_WAD_PATH)
+    G = Grid2(3, 3, 0)
+    G.set(1, 1, 1)
+    scale = 100.0
+    m = grid2map(G, refwad, scale)
+    print '%d verts, %d linedefs, %d sidedefs, %d sectors' % (len(m.verts), len(m.linedefs), len(m.sidedefs), len(m.sectors))
+    for v in m.verts:
+        v.x += int(0.2*scale*(random.random()*2-1))
+        v.y += int(0.2*scale*(random.random()*2-1))
+    wad.save_map_png(m, 'grid2map-square-test.png')
+
 if __name__ == '__main__':
+
+    test_grid2map()
+
     L = int(sys.argv[1])
     (G, locks, keys, space_tree, doors, spawn_node) = method2(L, int(sys.argv[2]))
 
@@ -553,7 +657,19 @@ if __name__ == '__main__':
     # synth playable wad
     refwad = wad.load(dero_config.DOOM1_WAD_PATH)
     scale = 4096/L
-    m = synth_map(G, doors, 'E1M1', scale, refwad)
+
+# m = synth_map(G, doors, 'E1M1', scale, refwad)
+    m = grid2map(G, refwad, scale)
+    m.name = 'E1M1'
+
+# draw it
+    print '%d linedefs' % len(m.linedefs)
+# jitter all verts a bit, to reveal dupes
+    for v in m.verts:
+        v.x += int(0.2*scale*(random.random()*2-1))
+        v.y += int(0.2*scale*(random.random()*2-1))
+    wad.save_map_png(m, 'grid2map-test.png')
+
     # add player start
     startpos = random.choice([c for c in G.cells_with_value(spawn_node)])
     m.add_player_start( int((startpos.x+0.5)*scale), int((startpos.y+0.5)*scale), 0 )

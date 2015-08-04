@@ -263,7 +263,11 @@ class ArrayLump:
 class Map:
 
     def __init__(s, name):
+        s.clear()
         s.name = name
+
+    def clear(s):
+        s.name = None
         s.things = []
         s.verts = []
         s.linedefs = []
@@ -451,6 +455,11 @@ def save_map_png(_map, fname):
     pylab.savefig(fname)
     print 'done plotting to %s' % fname
 
+def dump_all_maps(wadp):
+    content = load(wadp)
+    for m in content.maps:
+        save_map_png(m, m.name + '.png')
+
 def test_doom1_wad():
     path = dero_config.DOOM1_WAD_PATH
     content = load(path)
@@ -568,4 +577,5 @@ def create_square_map(ref):
     return rv
 
 if __name__ == "__main__":
-    test_doom1_wad()
+# test_doom1_wad()
+    dump_all_maps(dero_config.DOOM2_WAD_PATH)

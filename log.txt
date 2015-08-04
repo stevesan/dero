@@ -1,90 +1,25 @@
 
-how to make a door?
-doom spec line 1078
-linedef function
-S1
-T trigger model
-rightside of line
+DOORS:
+    how to make a door?
+    doom spec line 1078
+    linedef function
+    S1
+    T trigger model
+    rightside of line
+    11 == level exit
 
-11 == level exit
+GENERAL GEOMETRY GEN:
 
-what are:
-SEGS - part of BSP
-SSECTORS - part of BSP
-REJECT
-BLOCKMAP
+    ok, we have the high level gen algo, with a tree of generators...but what about the geo? 
+    the two-heightmaps approach? but want smooth diagonal lines
+    we can probably figure out a way to smooth out the diags, and just keep the grid pretty high res.
 
-try to compile/run part of DB. try to ls a wad file
-
-    Source/Core:
-        IO?
-            UniversalStreamWriter does a lot of relevant stuff
-                this seems more for serialization than WAD IO
-                like CopyPaste
-            DoomMapSetIO (created dynamically by MapSetIO.Create)
-                reads into MapSet from a WAD
-                takes a wad
-                writes line defs, etc. from MapSet into mounted wad
-                'MapSet' has verts, etc.
-            what is UDMF?
-                a universal format. perhaps Dero can just output these
-            WAD
-        Map
-            has Vertex, Linedef, etc.
-        Data
-            contains code to read wads, textures, etc.
-            WADReader <--- call this to load a wad?
-                see MapManager.InitializeOpenMap -> DataManager code paths
-                create CLI wrapper for MapManager!
-                LoadTextureSet
-
-        "MapManager" calls compiler. wad in, wad out
-
-get source to one of the bsp compilers
-
-NEXT: write a dummy map and run it in DOOM
+    the 2-heights abstraction is nice, as it makes space-creation algos pretty easy to think about
+    ie. distance field type ideas.
 
 ----------------------------------------
-7/6/2015
-
-Squidi's algo as is has one major issue: It can result in certain locks being totally skippable. The easiest way to see this is with the "V" case in my notebook. I came up with a fairly simple solution while flying back from Atlanta: We'll define a node as "needed" if its subtree contains either a needed key, or a needed lock, or the exit. A needed lock is simply a lock on a node that is needed, and a needed key is just a key to a needed lock. You can convince yourself pretty easily that if we only place needed locks, this makes every puzzle needed and unskippable due to the subtree relationship.
-
-So to generate a puzzle-tree that is entirely unskippable, we can use this algorithm:
-- First, mark the exit and all its ancestors as 'needed'. It's easy to see this is correct by definition.
-- When placing a lock, only choose from needed nodes.
-- When placing a key for a lock (which is going to be a needed lock), choose any node, but mark all its ancestors as needed.
-
-That's about it. I implemented it, and it works quite well. I'm calling it the "needy Squidi algo".
-
-I also added some logic for key placement. If you place a key too close to its lock, it's pretty lame, so I put in some logic to pick a node furthest from any existing needed nodes. This seems to work just fine as a first approximation.
-
-So as of now, the high-level algorithm is:
-- Seed-and-spread to get area image
-- Compute area adjacency graph and then its spanning tree (the "area tree")
-- Run needy-Squidi-algo on area tree to get puzzle graph
-
-I'm loving Python as a language for this. NetworkX has proven to be an amazing graph library, Pylab is great for math and visualization, and Python's functional-ish features (lambdas, list comprehensions, yield-style corountines) really rub me the right way. And having an interpretted language is great for rapid, dare I say 'artistic', iteration. It would be a pleasure to write game logic in Python with hot-loading, if that were done correctly (hotloading code is, apparently, not easy at all).
-
-Next major step: Produce the 2D geometry given the puzzle graph and the area image. I'm thinking..some marching-cubes-ish algorithm.
-
-
 ----------------------------------------
-7/15/2015
-
-A change of terminology: I'm calling 'areas' just 'spaces' now. 'Space' is more specific to what it actually is and has less abstract connotations. It's just a blob of contiguous voxels. To differentiate between different locked parts of the map, I think I'll use 'zone.' That has good military-ish connotations.
-
-The end result of the intermediate phase is then:
-- space grid
-    list of enter/exit locations
-- space graph
-- zone tree
-
-At this point, I have something that could function as a DOOM level that is non-trivial and has key-lock puzzles. So, in the spirit of "ship early", it's time to close the loop and actually make it playable in DOOM. I don't really want to write my own WAD writing pipeline, so I'm gonna try to use DoomBuilder's source code along with some node builder. Hopefully I can get nodebuilder source code and make it work on OSX - can't imagine why it wouldn't be portable code.
-
 ----------------------------------------
-
-
-output of an internal gen node:
 
 a list of spaces. each space has:
     region of grid
@@ -93,28 +28,6 @@ a list of spaces. each space has:
     each door:
         tag if locked
 
-
 issues with needy squidi algo:
     can often see key before seeing door.
-    
-    new rules:
-    1) do not place Ki on the critical path of Li. this takes care of the single-zone case. this alone is probably pretty good already
-    2) when placing Li, you can only consider the
-
-----------------------------------------
-7/28/2015
-
-I didn't like A, so I made B, then I tweaked it to C, and wanted to tweak it to D. Then I realized that D == A. I'll stick with C.
-
-I was looking at the output generated by my current lock-key algo, the "needy squidi", and a particular issue jumped out: you would often be able to get a key before you could reach the lock that it opens. And by 'before' I mean, you had to open a different lock before you could get to the lock. This seemed like bad design to me - letting players solve a puzzle before they even see the puzzle to be solved! So I started wondering how I could modify the needy-squidi algorithm to prevent this.
-
-However, after a bit of thinking, I realized that in order to prevent this I would basically be reverting to my very first algorithm: place a lock, place the key for the previous lock in the subtree, remove the subtree, repeat. In my current needy algo, when placing a lock, there are only 3 possibilities:
-1) You place the lock such that the subtree contains the previous key AND the previous lock.
-2) You place the lock such that the subtree contains only the previous lock <-- bad, because then the key would be accessible before the lock.
-3) You place the lock such that the subtree contains only the previous key.
-
-Now, cases 1 and 3 are desirable, but it is obvious then that this is equivalent to just placing the previous key under the new lock's subtree!
-
-So I'm not entirely sure what I'll do about this. The reason I moved away from the first algo is because I wanted more interesting puzzle structures. I guess I got exactly what I asked for, but ended up not quite liking the result. I suppose it's not so bad to find the key before the lock. If it is indeed a colored key and lock, then it won't be confusing. And plus, just because a key is accessible does not mean the player will necessarily find it. And plus, even in case #1 above, this possibility exists, so it's not categorically bad. And case #1 is essential for the first key/lock combo.
-
-So I guess I'll keep the structural algo as-is, but I will need to be aware of what the player is likely to see first by using layout and visual cues.
+    ok, just gonna be OK with this for now.
