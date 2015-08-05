@@ -687,3 +687,51 @@ def linear_simplify_poly(poly):
             a = b
             b = c
     return new_poly
+
+class GridEdges2:
+
+    def __init__(s, W, H, default):
+        s.leftlines = Grid2(W+1, H+1, default)
+        s.botlines = Grid2(W+1, H+1, default)
+
+    def get_grid_cell(s, u, edge ):
+        if edge == 0:
+            return (s.leftlines, u+Int2(1,0))
+        elif edge == 1:
+            return (s.botlines, u+Int2(0,1))
+        elif edge == 2:
+            return (s.leftlines, u)
+        else:
+            return (s.botlines, u)
+
+    def get(s, u, edge):
+        (grid, ut) = s.get_grid_cell(u, edge)
+        return grid.pget(ut)
+
+    def set(s, u, edge, value):
+        (grid, ut) = s.get_grid_cell(u, edge)
+        grid.pset( ut, value )
+
+class GridVerts2:
+    def __init__(s, W, H, default):
+        s.verts = Grid2(W+1, H+1, default)
+
+    EDGE_RIGHT_OFFSET = [
+        Int2(1,0),
+        Int2(1,1),
+        Int2(0,1),
+        Int2(0,0)
+    ]
+
+    def get_right(s, u, edge):
+        return s.verts.pget(u + GridVerts2.EDGE_RIGHT_OFFSET[edge])
+
+    def set_right(s, u, edge, value):
+        s.verts.pset( u + GridVerts2.EDGE_RIGHT_OFFSET[edge], value )
+
+    def get_left(s, u, edge):
+        return s.get_right(u, (edge + 1) % 4)
+
+    def set_left(s, u, edge, value):
+        return s.set_right(u, (edge + 1) % 4, value)
+
