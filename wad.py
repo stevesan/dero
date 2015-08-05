@@ -3,7 +3,7 @@ import struct
 import pylab
 from Queue import * 
 import random
-
+import utils
 import dero_config
 
 class WADFile:
@@ -286,6 +286,7 @@ class Map:
 
     def plot(s):
 
+        print 'plotting %d things, %d lines' % (len(s.things), len(s.linedefs))
         for t in s.things:
             pylab.plot([t.x], [t.y], '.'+get_color_for_thing(t.type))
         for ld in s.linedefs:
@@ -298,16 +299,18 @@ class Map:
         yy = [v.y for v in s.verts]
         dx = max(xx) - min(xx)
         dy = max(yy) - min(yy)
-        len = max(dx, dy) * 1.1
+        L = max(dx, dy) * 1.1
         cx = (max(xx)+min(xx))/2.0
         cy = (max(yy)+min(yy))/2.0
         aspect_ratio = 4.0/5.0
-        left = cx - len/2.0/aspect_ratio
-        right = cx + len/2.0/aspect_ratio
-        top = cy + len/2.0
-        bot = cy - len/2.0
+        left = cx - L/2.0/aspect_ratio
+        right = cx + L/2.0/aspect_ratio
+        top = cy + L/2.0
+        bot = cy - L/2.0
         pylab.xlim([ left, right ])
         pylab.ylim([ bot, top ])
+
+        print 'done'
 
     def unique_textures(s):
         uniqs = set()
@@ -354,6 +357,15 @@ class Map:
     def add_player_start(s, x, y, angle):
         t = Thing().fill([x, y, angle, 1, 0])
         s.things += [t]
+
+    def check_duplicate_verts(s):
+        print 'checking %d verts for dupes' % len(s.verts)
+        uniqverts = set()
+        for v in s.verts:
+            v2 = utils.Int2(v.x, v.y)
+            uniqverts.add(v2)
+        assert( len(uniqverts) == len(s.verts) )
+        print 'done'
 
 class WADContent:
     """ Should contain all essential contents of a WAD """
@@ -452,7 +464,6 @@ def save(path, header, lumps):
 
 def save_map_png(_map, fname):
     pylab.figure()
-    print 'plotting ...'
     _map.plot()
     pylab.grid(True)
     pylab.savefig(fname)

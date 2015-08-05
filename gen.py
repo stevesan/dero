@@ -621,8 +621,15 @@ def test_grid2map(refwad):
     G = Grid2(3, 3, 0)
     G.set(1, 1, 1)
     scale = 100.0
-    (m, vid2uses) = grid2map(G, scale, lambda x : False)
-    print '%d verts, %d linedefs, %d sidedefs, %d sectors' % (len(m.verts), len(m.linedefs), len(m.sidedefs), len(m.sectors))
+    (m, vid2uses) = grid2map(G, scale, lambda x : x == 0)
+    assert len(m.verts) == 4
+    assert len(m.linedefs) == 4
+    assert len(m.sidedefs) == 4
+    assert len(m.sectors) == 1
+
+    # make sure there are no dupe verts
+    m.check_duplicate_verts()
+        
     for v in m.verts:
         v.x += int(0.2*scale*(random.random()*2-1))
         v.y += int(0.2*scale*(random.random()*2-1))
@@ -666,12 +673,8 @@ if __name__ == '__main__':
 # m = synth_map(G, doors, 'E1M1', scale, refwad)
     (mapp, vid2uses) = grid2map(G, scale, lambda x : x == ' ')
     mapp.name = 'E1M1'
-
-    print ' BEFORE ----------------------------------------'
-    print mapp
     randomly_texture_map(mapp, refwad)
-    print ' AFTER ----------------------------------------'
-    print mapp
+    mapp.check_duplicate_verts()
 
     # add player start
     startpos = random.choice([c for c in G.cells_with_value(spawn_node)])
