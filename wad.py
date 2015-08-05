@@ -266,6 +266,9 @@ class Map:
         s.clear()
         s.name = name
 
+    def __str__(s):
+        return '%s: %d verts, %d sectors, %d sides, %d lines' % (s.name, len(s.verts), len(s.sectors), len(s.sidedefs), len(s.linedefs))
+
     def clear(s):
         s.name = None
         s.things = []
@@ -361,7 +364,7 @@ class WADContent:
         s.end_msg = None
 
     def read_lumps( s, directory, wad ):
-        _map = None
+        mapp = None
         
         for entry in directory:
             wad.f.seek(entry.filepos)
@@ -371,10 +374,10 @@ class WADContent:
             if wad.is_map_start_lump(name):
                 assert entry.size == 0
                 print 'reading map ' + entry.name
-                _map = Map(entry.name)
-                s.maps += [_map]
+                mapp = Map(entry.name)
+                s.maps += [mapp]
 
-            elif _map and _map.handle_lump(wad, entry, lumpend):
+            elif mapp and mapp.handle_lump(wad, entry, lumpend):
                 # no need to do anything - it handled it
                 pass
                     

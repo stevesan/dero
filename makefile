@@ -8,4 +8,4 @@ GENOUT=genout
 gen:
 	rm -rf $(GENOUT) || echo blah
 	mkdir $(GENOUT)
-	cd $(GENOUT) && python ../gen.py 20 4 && ../run_wad.sh built-playable.wad
+	cd $(GENOUT) && python ../gen.py 100 10 && ../run_wad.sh built-playable.wad

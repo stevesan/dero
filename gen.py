@@ -468,7 +468,6 @@ def add_poly_to_map(m, poly, uniform_scale, translation):
 
 def synth_map(G, doors, mapname, scale, refwad):
     refsec = random.choice([s for s in refwad.maps[0].sectors if s.floor_pic and s.ceil_pic])
-
     floortexs = set([sec.floor_pic for m in refwad.maps for sec in m.sectors if sec.floor_pic])
     ceiltexs = set([sec.ceil_pic for m in refwad.maps for sec in m.sectors if sec.ceil_pic])
     walltexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if sd.midtex])
@@ -535,9 +534,10 @@ def synth_map(G, doors, mapname, scale, refwad):
 
     return rv
 
-def grid2map(G, refwad, scale):
+def grid2map(G, scale):
     """ Converts a flat grid to a valid WAD with two-sided lines between all spaces """
-    val2sector = {}
+
+    val2sectorid = {}
 
     # Grids holding other primitive info
     verts = Grid2(G.W+2, G.H+2, None)
@@ -568,7 +568,6 @@ def grid2map(G, refwad, scale):
 
     def new_right_vert(u, edge):
         c = Int2.floor(right_vert(u, edge) * scale)
-        print 'created right vert ' + str(c)
         return wad.Vertex().fill([c.x, c.y])
 
     def get_or_set_right_vert(u, edge):
@@ -594,16 +593,18 @@ def grid2map(G, refwad, scale):
 
     for (u,p) in G.piter():
         sector = None
-        if p in val2sector:
-            sector = val2sector[p]
+        if p == ' ':
+            continue
+        if p in val2sectorid:
+            sid = val2sectorid[p]
         else:
-            sector = wad.Sector().fill([0, 128,      '-', '-',       128, 0, 0])
-            val2sector[p] = sector
+            print 'creating sector for grid value %s' % p
             sid = len(rv.sectors)
+            sector = wad.Sector().fill([0, 100,      '-', '-',       128, 0, 0])
             rv.sectors.append(sector)
+            val2sectorid[p] = sid
 
         for edge in range(4):
-            print u, edge
             v = u + EDGE_TO_NORM[edge]
             if not G.check(v):
                 continue
@@ -616,31 +617,58 @@ def grid2map(G, refwad, scale):
                     vid_left = get_or_set_left_vert(u, edge)
                     vid_right = get_or_set_right_vert(u, edge)
                     ld = wad.LineDef().fill([vid_left, vid_right, 0, 0, 0,   -1, -1])
+                    ld.set_flag('Impassible')
                     lid = set_linedef( u, edge, ld)
                 else:
-                    print 'reuse linedef %d' % lid
                     ld = rv.linedefs[lid]
+
+                # create our side def
+                sd = wad.SideDef().fill([0, 0,      '-', '-', '-', sid])
+                sdid = len(rv.sidedefs)
+                rv.sidedefs.append(sd)
+
+                if get_or_set_right_vert(u,edge) == ld.vert1:
+                    assert ld.sd_right == -1
+                    ld.sd_right = sdid
+                else:
+                    assert ld.sd_left == -1
+                    ld.sd_left = sdid
 
     return rv
 
 # test_polygonate_2()
 # test_polygonate_perlin()
 
-def test_grid2map():
-    refwad = wad.load(dero_config.DOOM1_WAD_PATH)
+def test_grid2map(refwad):
     G = Grid2(3, 3, 0)
     G.set(1, 1, 1)
     scale = 100.0
-    m = grid2map(G, refwad, scale)
+    m = grid2map(G, scale)
     print '%d verts, %d linedefs, %d sidedefs, %d sectors' % (len(m.verts), len(m.linedefs), len(m.sidedefs), len(m.sectors))
     for v in m.verts:
         v.x += int(0.2*scale*(random.random()*2-1))
         v.y += int(0.2*scale*(random.random()*2-1))
     wad.save_map_png(m, 'grid2map-square-test.png')
 
+def randomly_texture_map(mapp, refwad):
+    floortexs = set([sec.floor_pic for m in refwad.maps for sec in m.sectors if len(sec.floor_pic) > 2])
+    ceiltexs = set([sec.ceil_pic for m in refwad.maps for sec in m.sectors if len(sec.ceil_pic) > 2])
+    walltexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if len(sd.midtex) > 2])
+
+    for sec in mapp.sectors:
+        sec.floor_pic = random.sample(floortexs, 1)[0]
+        sec.ceil_pic = random.sample(ceiltexs, 1)[0]
+
+    for sd in mapp.sidedefs:
+        sd.midtex = random.sample(walltexs, 1)[0]
+        sd.uppertex = random.sample(walltexs, 1)[0]
+        sd.lowertex = random.sample(walltexs, 1)[0]
+
 if __name__ == '__main__':
 
-    test_grid2map()
+    refwad = wad.load(dero_config.DOOM1_WAD_PATH)
+
+    test_grid2map(refwad)
 
     L = int(sys.argv[1])
     (G, locks, keys, space_tree, doors, spawn_node) = method2(L, int(sys.argv[2]))
@@ -655,28 +683,33 @@ if __name__ == '__main__':
     pylab.savefig('grid.png')
 
     # synth playable wad
-    refwad = wad.load(dero_config.DOOM1_WAD_PATH)
     scale = 4096/L
 
 # m = synth_map(G, doors, 'E1M1', scale, refwad)
-    m = grid2map(G, refwad, scale)
-    m.name = 'E1M1'
+    mapp = grid2map(G, scale)
+    mapp.name = 'E1M1'
 
-# draw it
-    print '%d linedefs' % len(m.linedefs)
-# jitter all verts a bit, to reveal dupes
-    for v in m.verts:
-        v.x += int(0.2*scale*(random.random()*2-1))
-        v.y += int(0.2*scale*(random.random()*2-1))
-    wad.save_map_png(m, 'grid2map-test.png')
+    print ' BEFORE ----------------------------------------'
+    print mapp
+    randomly_texture_map(mapp, refwad)
+    print ' AFTER ----------------------------------------'
+    print mapp
 
     # add player start
     startpos = random.choice([c for c in G.cells_with_value(spawn_node)])
-    m.add_player_start( int((startpos.x+0.5)*scale), int((startpos.y+0.5)*scale), 0 )
+    mapp.add_player_start( int((startpos.x+0.5)*scale), int((startpos.y+0.5)*scale), 0 )
+
+# draw it
+    print '%d linedefs' % len(mapp.linedefs)
+# jitter all verts a bit, to reveal dupes
+    for v in mapp.verts:
+        v.x += int(0.2*scale*(random.random()*2-1))
+        v.y += int(0.2*scale*(random.random()*2-1))
+    wad.save_map_png(mapp, 'grid2map-test.png')
+
     lumps = []
-    m.append_lumps_to(lumps)
+    mapp.append_lumps_to(lumps)
     wad.save('source.wad', 'PWAD', lumps)
-# wad.save_map_png( m, 'expected.png' )
     dero_config.build_wad( 'source.wad', 'built-playable.wad' )
 
     # readback
