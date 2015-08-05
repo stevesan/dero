@@ -534,13 +534,12 @@ def synth_map(G, doors, mapname, scale, refwad):
 
     return rv
 
-def grid2map(G, scale):
+def grid2map(G, scale, is_unreachable):
     """ Converts a flat grid to a valid WAD with two-sided lines between all spaces """
 
     val2sectorid = {}
     vid2uses = {}
 
-    # Grids holding other primitive info
     vertids = GridVerts2(G.W, G.H, None)
     lineids = GridEdges2(G.W, G.H, None)
     rv = wad.Map('')
@@ -566,9 +565,9 @@ def grid2map(G, scale):
     def get_or_set_left_vert(u, edge): return get_or_set_right_vert(u, (edge+1)%4)
 
     for (u,p) in G.piter():
-        sector = None
-        if p == ' ':
+        if is_unreachable(p):
             continue
+
         if p in val2sectorid:
             sid = val2sectorid[p]
         else:
@@ -622,7 +621,7 @@ def test_grid2map(refwad):
     G = Grid2(3, 3, 0)
     G.set(1, 1, 1)
     scale = 100.0
-    (m, vid2uses) = grid2map(G, scale)
+    (m, vid2uses) = grid2map(G, scale, lambda x : False)
     print '%d verts, %d linedefs, %d sidedefs, %d sectors' % (len(m.verts), len(m.linedefs), len(m.sidedefs), len(m.sectors))
     for v in m.verts:
         v.x += int(0.2*scale*(random.random()*2-1))
@@ -665,7 +664,7 @@ if __name__ == '__main__':
     scale = 4096/L
 
 # m = synth_map(G, doors, 'E1M1', scale, refwad)
-    (mapp, vid2uses) = grid2map(G, scale)
+    (mapp, vid2uses) = grid2map(G, scale, lambda x : x == ' ')
     mapp.name = 'E1M1'
 
     print ' BEFORE ----------------------------------------'
