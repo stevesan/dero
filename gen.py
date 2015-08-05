@@ -303,19 +303,20 @@ def method2(L, numRegions):
     colors[exit_node] = 'g'
     labels[exit_node] += 'EX'
 
-    def draw_labels(graph):
-        for node in graph.nodes():
+    def draw_labels(G):
+        for node in G.nodes():
             pylab.annotate(labels[node], xy=add2(nodepos[node],(-2, 3)))
 
 # DEFINITION: a lock node means, to get TO IT, requires a key.
 
     locks = []
     keys = []
+    last_gate = exit_node
 
     def on_key(k):
         keys.append(k)
         colors[k] = 'y'
-        labels[k] += ' K%d' % len(keys)
+        labels[k] += ' K%d' % (len(keys)-1)
 
     def on_gate(g):
         locks.append(g)
@@ -326,7 +327,7 @@ def method2(L, numRegions):
             colors[u] = 'r'
         colors[g] = 'k'
 
-    def write_state_png():
+    def output_state():
         pylab.figure()
         nx.draw(space_tree, nodepos, node_color=[colors[v] for v in space_tree.nodes()])
         pylab.xlim([0, L])
