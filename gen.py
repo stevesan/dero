@@ -10,6 +10,7 @@ from planar import Vec2
 from utils import *
 import dero_config
 import wad
+import noise
 
 def testBasic():
     g = Grid2(80,80,' ')
@@ -237,7 +238,7 @@ def needy_squidi_keylock_algo(tree, spawn_node, exit_node, ideal_zone_size):
         def eval_dist_to_needed(node):
             count = 0
             u = node
-            while u and not u in needed_nodes:
+            while u and u not in needed_nodes:
                 count += 1
                 u = get_parent(remaining, u)
             return count
@@ -582,7 +583,9 @@ def grid2map(G, scale, is_unreachable):
             if not G.check(v):
                 continue
             q = G.pget(v)
+            print 'new line?'
             if p != q:
+                print 'new line between', p, q
                 # check if linedef here already
                 lid = lineids.get(u, edge)
                 if lid == None:
@@ -612,7 +615,7 @@ def grid2map(G, scale, is_unreachable):
                     assert ld.sd_left == -1
                     ld.sd_left = sdid
 
-    return (rv, vid2uses)
+    return (rv, vid2uses, val2sectorid)
 
 # test_polygonate_2()
 # test_polygonate_perlin()
@@ -621,7 +624,7 @@ def test_grid2map(refwad):
     G = Grid2(3, 3, 0)
     G.set(1, 1, 1)
     scale = 100.0
-    (m, vid2uses) = grid2map(G, scale, lambda x : x == 0)
+    (m, vid2uses, _) = grid2map(G, scale, lambda x : x == 0)
     assert len(m.verts) == 4
     assert len(m.linedefs) == 4
     assert len(m.sidedefs) == 4
@@ -635,21 +638,61 @@ def test_grid2map(refwad):
         v.y += int(0.2*scale*(random.random()*2-1))
     wad.save_map_png(m, 'grid2map-square-test.png')
 
-def randomly_texture_map(mapp, refwad):
+
+def randomly_assign_textures(mapp, refwad):
     floortexs = set([sec.floor_pic for m in refwad.maps for sec in m.sectors if len(sec.floor_pic) > 2])
     ceiltexs = set([sec.ceil_pic for m in refwad.maps for sec in m.sectors if len(sec.ceil_pic) > 2])
-    walltexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if len(sd.midtex) > 2])
+    midtexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if len(sd.midtex) > 2])
+    uppertexs = set([sd.uppertex for m in refwad.maps for sd in m.sidedefs if len(sd.uppertex) > 2])
+    lowertexs = set([sd.lowertex for m in refwad.maps for sd in m.sidedefs if len(sd.lowertex) > 2])
 
     for sec in mapp.sectors:
         sec.floor_pic = random.sample(floortexs, 1)[0]
         sec.ceil_pic = random.sample(ceiltexs, 1)[0]
 
     for sd in mapp.sidedefs:
-        sd.midtex = random.sample(walltexs, 1)[0]
-        sd.uppertex = random.sample(walltexs, 1)[0]
-        sd.lowertex = random.sample(walltexs, 1)[0]
+        sd.midtex = random.sample(midtexs, 1)[0]
+        sd.uppertex = random.sample(uppertexs, 1)[0]
+        sd.lowertex = random.sample(lowertexs, 1)[0]
+
+class CellData:
+    def __init__(s):
+        s.space = None
+        s.floorht = int(0)
+        s.ceilht = int(100)
+
+    def __str__(s):
+        return 'CellData, space=%s, [%d,%d]' % (str(s.space), s.floorht, s.ceilht)
+
+    def __eq__(s, other):
+        return s.space == other.space and s.floorht == other.floorht and s.ceilht == other.ceilht
+
+    def __ne__(s, other):
+        return not s.__eq__(other)
+
+    def __hash__(s):
+        return hash((s.space, s.floorht, s.ceilht))
+
+    @staticmethod
+    def test():
+        d1 = CellData()
+        d2 = CellData()
+        d3 = CellData()
+
+        d1.space = 'a'
+        d2.space = 'a'
+        d3.space = ' '
+
+        assert d1 == d1
+        assert d1 == d2
+        assert d2 == d1
+        assert d3 != d1
+        assert d3 != d2
+
 
 if __name__ == '__main__':
+
+    CellData.test()
 
     refwad = wad.load(dero_config.DOOM1_WAD_PATH)
 
@@ -658,7 +701,7 @@ if __name__ == '__main__':
     L = int(sys.argv[1])
     (G, locks, keys, space_tree, doors, spawn_node) = method2(L, int(sys.argv[2]))
 
-    print 'draw grid'
+    print 'draw space grid'
     pylab.figure()
     G.show_image()
     # write adjacency positions too, ie. the doors from one space to the next
@@ -667,18 +710,34 @@ if __name__ == '__main__':
         pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
     pylab.savefig('grid.png')
 
+    # create enhanced grid
+    G2 = Grid2(G.W, G.H, None)
+    for (u, p) in G.piter():
+        data = CellData()
+        data.space = p
+        G2.pset(u, data)
+
     # synth playable wad
     scale = 4096/L
 
-# m = synth_map(G, doors, 'E1M1', scale, refwad)
-    (mapp, vid2uses) = grid2map(G, scale, lambda x : x == ' ')
+    startcell = random.choice([c for c in G.cells_with_value(spawn_node)])
+    # raise start pos a bit
+    startdata = G2.pget(startcell)
+    startdata.floorht = 20
+
+    (mapp, vid2uses, cell2secid) = grid2map(G2, scale, lambda data : data.space == ' ')
+# transfer floor/ceil hts
+    for data in cell2secid:
+        sid = cell2secid[data]
+        sector = mapp.sectors[sid]
+        sector.floor_height = data.floorht
+        sector.ceil_height = data.ceilht
     mapp.name = 'E1M1'
-    randomly_texture_map(mapp, refwad)
+    randomly_assign_textures(mapp, refwad)
     mapp.check_duplicate_verts()
 
     # add player start
-    startpos = random.choice([c for c in G.cells_with_value(spawn_node)])
-    mapp.add_player_start( int((startpos.x+0.5)*scale), int((startpos.y+0.5)*scale), 0 )
+    mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)
