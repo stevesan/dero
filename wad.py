@@ -221,6 +221,11 @@ class SideDef(SimpleStruct):
     def has_all_textures(s):
         return len(s.uppertex) > 1 and len(s.midtex) > 1 and len(s.lowertex)> 1
 
+    def set_clear_textures(s):
+        s.midtex = '-'
+        s.uppertex = '-'
+        s.lowertex = '-'
+
 class DummyLump():
     """ Used for directory markers, like levels """
 
@@ -358,7 +363,7 @@ class Map:
         t = Thing().fill([x, y, angle, 1, 0])
         s.things += [t]
 
-    def check_duplicate_verts(s):
+    def sanity_asserts(s):
         print 'checking %d verts for dupes' % len(s.verts)
         uniqverts = set()
         for v in s.verts:
@@ -366,6 +371,14 @@ class Map:
             uniqverts.add(v2)
         assert( len(uniqverts) == len(s.verts) )
         print 'done'
+
+# check linedefs
+        for ld in s.linedefs:
+            assert ld.sd_right != None and ld.sd_right >= 0
+            assert ld.sd_right != ld.sd_left
+
+        for sd in s.sidedefs:
+            assert sd.sector != None and sd.sector >= 0
 
 class WADContent:
     """ Should contain all essential contents of a WAD """

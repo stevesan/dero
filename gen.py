@@ -436,224 +436,142 @@ def test_left_vert():
     plot_poly( poly, '.-' )
     pylab.show()
 
-def add_poly_to_map(m, poly, uniform_scale, translation):
-    assert type(translation) == Vector2
-    nverts = len(poly)
-    first_vid = len(m.verts)
-    first_lid = len(m.linedefs)
-    first_sid = len(m.sidedefs)
-    secid = len(m.sectors)
-
-    for vert in poly:
-        vert = Int2.floor( uniform_scale*vert + translation )
-        m.verts.append( wad.Vertex().fill([vert.x, vert.y]) )
-
-    sector = wad.Sector().fill([0, 100, '-', '-', 128, 0, 0])
-    m.sectors.append( sector )
-
-    for vertnum in range(len(poly)):
-        sd = wad.SideDef().fill([0, 0, '-', '-', '-', secid])
-        m.sidedefs.append(sd)
-
-        v0 = first_vid + (vertnum % nverts)
-        v1 = first_vid + ((vertnum+1) % nverts)
-        assert v0 < len(m.verts)
-        assert v1 < len(m.verts)
-        sd_right = first_sid + vertnum
-        assert sd_right == len(m.sidedefs)-1
-        ld = wad.LineDef().fill([v0, v1,    0, 0, 0,    sd_right, -1]).set_flag('Impassible')
-        lineid = vertnum
-        m.linedefs.append(ld)
-
-    return sector
-
-def synth_map(G, doors, mapname, scale, refwad):
-    refsec = random.choice([s for s in refwad.maps[0].sectors if s.floor_pic and s.ceil_pic])
-    floortexs = set([sec.floor_pic for m in refwad.maps for sec in m.sectors if sec.floor_pic])
-    ceiltexs = set([sec.ceil_pic for m in refwad.maps for sec in m.sectors if sec.ceil_pic])
-    walltexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if sd.midtex])
-
-    print '----------------------------------------'
-    print floortexs
-    print ceiltexs
-
-    spaces = set([a for (a,b) in doors] + [b for (a,b) in doors])
-    rv = wad.Map(mapname)
-
-    for space in spaces:
-        print '--- space ' + space
-
-        door_edges = set()
-
-        def on_edge(u, v, polyid, edgeid):
-            assert polyid == 0
-            door = asc(G.pget(u), G.pget(v))
-            if door in doors:
-                if unordered_equal(doors[door], (u,v)):
-                    print 'door', str(door) + ' at edge %d' % (edgeid), u, v
-                    door_edges.add(edgeid)
-
-        polys = polygonate(G, lambda x : x == space, True, on_edge)
-        assert len(polys) == 1
-        poly = polys[0]
-# poly = linear_simplify_poly(poly)
-        """
-        pylab.figure()
-        draw_polys([poly])
-        pylab.xlim([-1, G.W+1])
-        pylab.ylim([-1, G.H+1])
-        pylab.grid(True)
-        pylab.savefig('space-%s-poly.png' % space)
-        """
-
-        lineid_base = len(rv.linedefs)
-        sdid_base = len(rv.sidedefs)
-        sector = add_poly_to_map( rv, poly, scale, Vector2(0,0) )
-        sector.floor_pic = random.sample(floortexs,1)[0]
-        sector.ceil_pic = random.sample(ceiltexs,1)[0]
-
-        walltex = random.sample(walltexs,1)[0]
-        for sdid in range(sdid_base, len(rv.sidedefs)):
-            rv.sidedefs[sdid].midtex = walltex
-
-        # make doors where they should be
-        doortex = random.choice([tex for tex in walltexs if 'DOOR' in tex])
-        print 'door tex = %s' % doortex
-        for did in door_edges:
-            ld = rv.linedefs[lineid_base + did]
-            ld.clear_flag('Impassible')
-            sd = rv.sidedefs[ld.sd_right]
-            sd.midtex = doortex
-            v0 = rv.verts[ld.vert0]
-            v1 = rv.verts[ld.vert1]
-
-            print 'made door at %d,%d -> %d,%d' % (v0.x*1.0/scale, v0.y*1.0/scale,
-                    v1.x*1.0/scale, v1.y*1.0/scale)
-
-        assert len(rv.linedefs) == lineid_base + len(poly)
-        assert len(rv.sidedefs) == sdid_base + len(poly)
-
-    return rv
-
-def grid2map(G, scale, is_unreachable):
+class MapGeoBuilder:
     """ Converts a flat grid to a valid WAD with two-sided lines between all spaces """
 
-    val2sectorid = {}
-    vid2uses = {}
+    def __init__(s, mapp):
+        s.mapp = mapp
 
-    vertids = GridVerts2(G.W, G.H, None)
-    lineids = GridEdges2(G.W, G.H, None)
-    rv = wad.Map('')
+    def reset(s, G):
+        s.val2sectorid = {}
+        s.vid2uses = {}
+        s.vertids = GridVerts2(G.W, G.H, None)
+        s.lineids = GridEdges2(G.W, G.H, None)
 
-    def add_linedef(u, edge, ld):
-        lid = len(rv.linedefs)
-        rv.linedefs.append(ld)
-        lineids.set(u, edge, lid)
+    def get_linedef_id(s, u, v):
+        return s.lineids.get_between(u, v)
 
-    def new_right_vert(u, edge):
-        c = Int2.floor(right_vert(u, edge) * scale)
-        return wad.Vertex().fill([c.x, c.y])
+    def build(s, G, scale, is_unreachable):
+        s.reset(G)
 
-    def get_or_set_right_vert(u, edge):
-        vid = vertids.get_right(u, edge)
-        if vid == None:
-            vert = new_right_vert(u, edge)
-            vid = len(rv.verts)
-            rv.verts.append(vert)
-            vertids.set_right( u, edge, vid )
-        return vid
+        mapp = s.mapp
+        val2sectorid = s.val2sectorid
+        vid2uses = s.vid2uses
 
-    def get_or_set_left_vert(u, edge): return get_or_set_right_vert(u, (edge+1)%4)
+        def add_linedef(u, edge, ld):
+            lid = len(mapp.linedefs)
+            mapp.linedefs.append(ld)
+            s.lineids.set(u, edge, lid)
 
-    for (u,p) in G.piter():
-        if is_unreachable(p):
-            continue
+        def new_right_vert(u, edge):
+            c = Int2.floor(right_vert(u, edge) * scale)
+            return wad.Vertex().fill([c.x, c.y])
 
-        if p in val2sectorid:
-            sid = val2sectorid[p]
-        else:
-            print 'creating sector for grid value %s' % p
-            sid = len(rv.sectors)
-            sector = wad.Sector().fill([0, 100,      '-', '-',       128, 0, 0])
-            rv.sectors.append(sector)
-            val2sectorid[p] = sid
+        def get_or_set_right_vert(u, edge):
+            vid = s.vertids.get_right(u, edge)
+            if vid == None:
+                vert = new_right_vert(u, edge)
+                vid = len(mapp.verts)
+                mapp.verts.append(vert)
+                s.vertids.set_right( u, edge, vid )
+            return vid
 
-        for edge in range(4):
-            v = u + EDGE_TO_NORM[edge]
-            if not G.check(v):
+        def get_or_set_left_vert(u, edge): return get_or_set_right_vert(u, (edge+1)%4)
+
+        for (u,p) in G.piter():
+            if is_unreachable(p):
                 continue
-            q = G.pget(v)
-            print 'new line?'
-            if p != q:
-                print 'new line between', p, q
-                # check if linedef here already
-                lid = lineids.get(u, edge)
-                if lid == None:
-                    # verts there?
-                    vid_left = get_or_set_left_vert(u, edge)
-                    vid_right = get_or_set_right_vert(u, edge)
-                    ld = wad.LineDef().fill([vid_left, vid_right, 0, 0, 0,   -1, -1])
-                    ld.set_flag('Impassible')
-                    lid = add_linedef( u, edge, ld)
 
-                    if vid_left not in vid2uses: vid2uses[vid_left] = 0
-                    vid2uses[vid_left] += 1
-                    if vid_right not in vid2uses: vid2uses[vid_right] = 0
-                    vid2uses[vid_right] += 1
-                else:
-                    ld = rv.linedefs[lid]
+            if p in val2sectorid:
+                sid = val2sectorid[p]
+            else:
+                print 'creating sector for grid value %s' % p
+                sid = len(mapp.sectors)
+                sector = wad.Sector().fill([0, 100,      '-', '-',       128, 0, 0])
+                mapp.sectors.append(sector)
+                val2sectorid[p] = sid
 
-                # create our side def
-                sd = wad.SideDef().fill([0, 0,      '-', '-', '-', sid])
-                sdid = len(rv.sidedefs)
-                rv.sidedefs.append(sd)
+            for edge in range(4):
+                v = u + EDGE_TO_NORM[edge]
+                if not G.check(v):
+                    continue
+                q = G.pget(v)
+                if p != q:
+                    # check if linedef here already
+                    lid = s.lineids.get(u, edge)
+                    if lid == None:
+                        # verts there?
+                        vid_left = get_or_set_left_vert(u, edge)
+                        vid_right = get_or_set_right_vert(u, edge)
+                        ld = wad.LineDef().fill([vid_left, vid_right, 0, 0, 0,   -1, -1])
+                        ld.set_flag('Impassible')
+                        lid = add_linedef( u, edge, ld)
 
-                if get_or_set_right_vert(u,edge) == ld.vert1:
-                    assert ld.sd_right == -1
-                    ld.sd_right = sdid
-                else:
-                    assert ld.sd_left == -1
-                    ld.sd_left = sdid
+                        if vid_left not in vid2uses: vid2uses[vid_left] = 0
+                        vid2uses[vid_left] += 1
+                        if vid_right not in vid2uses: vid2uses[vid_right] = 0
+                        vid2uses[vid_right] += 1
+                    else:
+                        ld = mapp.linedefs[lid]
 
-    return (rv, vid2uses, val2sectorid)
+                    # create our side def
+                    sd = wad.SideDef().fill([0, 0,      '-', '-', '-', sid])
+                    sdid = len(mapp.sidedefs)
+                    mapp.sidedefs.append(sd)
+
+                    if get_or_set_right_vert(u,edge) == ld.vert1:
+                        assert ld.sd_right == -1
+                        ld.sd_right = sdid
+                    else:
+                        assert ld.sd_left == -1
+                        ld.sd_left = sdid
+
+    def make_border(s, u, v):
+        """ Borders are just linedefs that demarcate height and/or texture, as oppposed to being walls """
+        ld = s.mapp.linedefs[ s.get_linedef_id(u, v) ]
+        ld.clear_flag('Impassible').set_flag('Two-sided')
+        sd_right = s.mapp.sidedefs[ld.sd_right]
+        sd_left = s.mapp.sidedefs[ld.sd_left]
+        sd_right.midtex = '-'
+        sd_left.midtex = '-'
 
 # test_polygonate_2()
 # test_polygonate_perlin()
 
-def test_grid2map(refwad):
+def test_grid2map():
     G = Grid2(3, 3, 0)
     G.set(1, 1, 1)
     scale = 100.0
-    (m, vid2uses, _) = grid2map(G, scale, lambda x : x == 0)
+    m = wad.Map('E1M1')
+    builder = MapGeoBuilder(m)
+    builder.build(G, scale, lambda x : x == 0)
     assert len(m.verts) == 4
     assert len(m.linedefs) == 4
     assert len(m.sidedefs) == 4
     assert len(m.sectors) == 1
 
     # make sure there are no dupe verts
-    m.check_duplicate_verts()
+    m.sanity_asserts()
         
     for v in m.verts:
         v.x += int(0.2*scale*(random.random()*2-1))
         v.y += int(0.2*scale*(random.random()*2-1))
-    wad.save_map_png(m, 'grid2map-square-test.png')
+    wad.save_map_png(m, 'mapgeobuilder-square-test.png')
 
+def read_texnames(path):
+    with open(path, 'r') as f:
+        return [line.strip() for line in f]
 
-def randomly_assign_textures(mapp, refwad):
-    floortexs = set([sec.floor_pic for m in refwad.maps for sec in m.sectors if len(sec.floor_pic) > 2])
-    ceiltexs = set([sec.ceil_pic for m in refwad.maps for sec in m.sectors if len(sec.ceil_pic) > 2])
-    midtexs = set([sd.midtex for m in refwad.maps for sd in m.sidedefs if len(sd.midtex) > 2])
-    uppertexs = set([sd.uppertex for m in refwad.maps for sd in m.sidedefs if len(sd.uppertex) > 2])
-    lowertexs = set([sd.lowertex for m in refwad.maps for sd in m.sidedefs if len(sd.lowertex) > 2])
+def assign_debug_textures(mapp):
 
-    for sec in mapp.sectors:
-        sec.floor_pic = random.sample(floortexs, 1)[0]
-        sec.ceil_pic = random.sample(ceiltexs, 1)[0]
+    for (sid, sec) in id_iter(mapp.sectors):
+        sec.floor_pic = 'FLOOR0_1'
+        sec.ceil_pic = 'CEIL1_1'
 
     for sd in mapp.sidedefs:
-        sd.midtex = random.sample(midtexs, 1)[0]
-        sd.uppertex = random.sample(uppertexs, 1)[0]
-        sd.lowertex = random.sample(lowertexs, 1)[0]
+        sd.midtex = 'METAL'
+        sd.uppertex = 'PIPE2'
+        sd.lowertex = 'BROWN1'
 
 class CellData:
     def __init__(s):
@@ -694,9 +612,7 @@ if __name__ == '__main__':
 
     CellData.test()
 
-    refwad = wad.load(dero_config.DOOM1_WAD_PATH)
-
-    test_grid2map(refwad)
+    test_grid2map()
 
     L = int(sys.argv[1])
     (G, locks, keys, space_tree, doors, spawn_node) = method2(L, int(sys.argv[2]))
@@ -718,26 +634,36 @@ if __name__ == '__main__':
         G2.pset(u, data)
 
     # synth playable wad
-    scale = 4096/L
+    scale = 6000/L
 
     startcell = random.choice([c for c in G.cells_with_value(spawn_node)])
     # raise start pos a bit
     startdata = G2.pget(startcell)
-    startdata.floorht = 20
+    startdata.floorht = 40
 
-    (mapp, vid2uses, cell2secid) = grid2map(G2, scale, lambda data : data.space == ' ')
-# transfer floor/ceil hts
-    for data in cell2secid:
-        sid = cell2secid[data]
+    mapp = wad.Map('E1M1')
+    geo = MapGeoBuilder(mapp)
+    geo.build(G2, scale, lambda data : data.space == ' ')
+    assign_debug_textures(mapp)
+
+    # transfer floor/ceil hts
+    for data in geo.val2sectorid:
+        sid = geo.val2sectorid[data]
         sector = mapp.sectors[sid]
         sector.floor_height = data.floorht
         sector.ceil_height = data.ceilht
-    mapp.name = 'E1M1'
-    randomly_assign_textures(mapp, refwad)
-    mapp.check_duplicate_verts()
+
+    # create doors
+    for (p,q) in doors:
+        (u,v) = doors[(p,q)]
+        geo.make_border(u, v)
 
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
+
+    # break down all walls around player start
+    for v in startcell.yield_4nbors():
+        geo.make_border(startcell, v)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)
@@ -745,7 +671,9 @@ if __name__ == '__main__':
     for v in mapp.verts:
         v.x += int(0.2*scale*(random.random()*2-1))
         v.y += int(0.2*scale*(random.random()*2-1))
-    wad.save_map_png(mapp, 'grid2map-test.png')
+    wad.save_map_png(mapp, 'grid2mapgeo-test.png')
+
+    mapp.sanity_asserts()
 
     lumps = []
     mapp.append_lumps_to(lumps)

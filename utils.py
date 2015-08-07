@@ -335,6 +335,8 @@ EDGE_TO_NORM = [
     Int2(0, -1)
 ]
 
+NORM_TO_EDGE = { EDGE_TO_NORM[edge] : edge for edge in range(4) }
+
 nbor8dx = [1, 1, 0, -1, -1, -1, 0, 1]
 nbor8dy = [0, 1, 1, 1, 0, -1, -1, -1]
 
@@ -712,6 +714,11 @@ class GridEdges2:
         (grid, ut) = s.get_grid_cell(u, edge)
         grid.pset( ut, value )
 
+    def get_between(s, u, v):
+        norm = v - u
+        edge = NORM_TO_EDGE[norm]
+        return s.get(u, edge)
+
 class GridVerts2:
     def __init__(s, W, H, default):
         s.verts = Grid2(W+1, H+1, default)
@@ -735,3 +742,6 @@ class GridVerts2:
     def set_left(s, u, edge, value):
         return s.set_right(u, (edge + 1) % 4, value)
 
+def id_iter(listt):
+    for i in range(len(listt)):
+        yield (i, listt[i])
