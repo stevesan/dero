@@ -451,7 +451,7 @@ class MapGeoBuilder:
     def get_linedef_id(s, u, v):
         return s.lineids.get_between(u, v)
 
-    def build(s, G, scale, is_unreachable):
+    def synth_grid(s, G, scale, is_unreachable):
         s.reset(G)
 
         mapp = s.mapp
@@ -500,11 +500,9 @@ class MapGeoBuilder:
                     # check if linedef here already
                     lid = s.lineids.get(u, edge)
                     if lid == None:
-                        # verts there?
                         vid_left = get_or_set_left_vert(u, edge)
                         vid_right = get_or_set_right_vert(u, edge)
                         ld = wad.LineDef().fill([vid_left, vid_right, 0, 0, 0,   -1, -1])
-                        ld.set_flag('Impassible')
                         lid = add_linedef( u, edge, ld)
 
                         if vid_left not in vid2uses: vid2uses[vid_left] = 0
@@ -544,7 +542,7 @@ def test_grid2map():
     scale = 100.0
     m = wad.Map('E1M1')
     builder = MapGeoBuilder(m)
-    builder.build(G, scale, lambda x : x == 0)
+    builder.synth_grid(G, scale, lambda x : x == 0)
     assert len(m.verts) == 4
     assert len(m.linedefs) == 4
     assert len(m.sidedefs) == 4
@@ -572,6 +570,12 @@ def assign_debug_textures(mapp):
         sd.midtex = 'METAL'
         sd.uppertex = 'PIPE2'
         sd.lowertex = 'BROWN1'
+
+    for ld in mapp.linedefs:
+        if ld.sd_right != -1 and ld.sd_left != -1:
+            ld.set_flag('Two-sided')
+            mapp.sidedefs[ld.sd_right].midtex = '-'
+            mapp.sidedefs[ld.sd_left].midtex = '-'
 
 class CellData:
     def __init__(s):
@@ -636,34 +640,31 @@ if __name__ == '__main__':
     # synth playable wad
     scale = 6000/L
 
-    startcell = random.choice([c for c in G.cells_with_value(spawn_node)])
+    spawnAreaCells = [c for c in G.cells_with_value(spawn_node)]
+
+    # poke some random holes in the spawn area
+    for _ in range(25):
+        G2.pget( random.choice(spawnAreaCells) ).space = ' '
+
+    startcell = random.choice(spawnAreaCells)
     # raise start pos a bit
     startdata = G2.pget(startcell)
     startdata.floorht = 40
 
     mapp = wad.Map('E1M1')
-    geo = MapGeoBuilder(mapp)
-    geo.build(G2, scale, lambda data : data.space == ' ')
+    builder = MapGeoBuilder(mapp)
+    builder.synth_grid(G2, scale, lambda data : data.space == ' ')
     assign_debug_textures(mapp)
 
     # transfer floor/ceil hts
-    for data in geo.val2sectorid:
-        sid = geo.val2sectorid[data]
+    for data in builder.val2sectorid:
+        sid = builder.val2sectorid[data]
         sector = mapp.sectors[sid]
         sector.floor_height = data.floorht
         sector.ceil_height = data.ceilht
 
-    # create doors
-    for (p,q) in doors:
-        (u,v) = doors[(p,q)]
-        geo.make_border(u, v)
-
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
-
-    # break down all walls around player start
-    for v in startcell.yield_4nbors():
-        geo.make_border(startcell, v)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)

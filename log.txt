@@ -31,3 +31,21 @@ a list of spaces. each space has:
 issues with needy squidi algo:
     can often see key before seeing door.
     ok, just gonna be OK with this for now.
+
+----------------------------------------
+
+
+ok handle multiple heights...?
+
+wall could be:
+    1) finite area, no sector. for border
+    2) a single impassible linedef. good for gates
+    3) finite area, has sector that is too tall/low to pass. for windows.
+
+ok i guess we do need to support all 3 cases...
+
+1 naturally works, with is_unreachable
+2 is default, 3 doesn't work yet.
+
+seems like #2 should be the more rare case. like, explicity specify when you want these kind of walls. or jsut do it after the fact.
+

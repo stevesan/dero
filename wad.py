@@ -199,6 +199,11 @@ class LineDef(SimpleStruct):
         s.flags |= 1 << n
         return s
 
+    def get_flag(s, flag):
+        assert flag in LineDef.FLAGBIT
+        n = LineDef.FLAGBIT[flag]
+        return (s.flags & 1 << n) > 0
+
     def clear_flag(s, flag):
         assert flag in LineDef.FLAGBIT
         n = LineDef.FLAGBIT[flag]
@@ -297,7 +302,11 @@ class Map:
         for ld in s.linedefs:
             p0 = s.verts[ld.vert0]
             p1 = s.verts[ld.vert1]
-            pylab.plot( [p0.x, p1.x], [p0.y, p1.y], 'k-' )
+            color = 'k'
+            if ld.sd_right >= 0 and ld.sd_left >= 0:
+                assert ld.get_flag('Two-sided')
+                color = '0.8'
+            pylab.plot( [p0.x, p1.x], [p0.y, p1.y], '-', color=color )
 
         # make it square
         xx = [v.x for v in s.verts]
@@ -478,9 +487,9 @@ def save(path, header, lumps):
 def save_map_png(_map, fname):
     pylab.figure()
     _map.plot()
-    pylab.grid(True)
     pylab.savefig(fname)
     print 'done plotting to %s' % fname
+    pylab.close()
 
 def dump_all_maps(wadp):
     content = load(wadp)
@@ -605,4 +614,5 @@ def create_square_map(ref):
 
 if __name__ == "__main__":
 # test_doom1_wad()
+    dump_all_maps(dero_config.DOOM1_WAD_PATH)
     dump_all_maps(dero_config.DOOM2_WAD_PATH)
