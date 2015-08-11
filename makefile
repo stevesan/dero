@@ -4,11 +4,12 @@ testwad:
 	mkdir $(TESTOUT) || echo blah
 	cd $(TESTOUT) && python ../wad.py && ../run_wad.sh square-built.wad
 
-GENOUT=genout
+WORKDIR=WORK
 gen:
-	rm -rf $(GENOUT) || echo blah
-	mkdir $(GENOUT)
-	cd $(GENOUT) && python ../gen.py 100 10 && ../run_wad.sh built-playable.wad
+	mkdir $(WORKDIR) || echo already exists, ok
+	rm $(WORKDIR)/locks*.png || echo ok
+	cd $(WORKDIR) && python ../gen.py 50 30 && ../run_wad.sh built-playable.wad
 
 drawwads:
 	cd allmaps && python ../wad.py
+

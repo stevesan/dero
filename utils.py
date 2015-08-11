@@ -67,13 +67,19 @@ class Int2:
         return hash((self.x,self.y))
 
     def __repr__(self):
-        return '%d,%d' % (self.x, self.y)
+        return 'Int2(%d,%d)' % (self.x, self.y)
 
     def __add__(u,v):
         return Int2(u.x+v.x, u.y+v.y)
 
     def __sub__(u,v):
         return Int2(u.x-v.x, u.y-v.y)
+
+    def __div__(u, s):
+        return Int2(u.x/s, u.y/s)
+
+    def __mul__(u, s):
+        return Int2(u.x*s, u.y*s)
 
     def yieldtest(self):
         yield 1
@@ -96,6 +102,12 @@ class Int2:
         p = self
         for i in range(8):
             yield Int2(p.x+nbor8dx[i], p.y+nbor8dy[i])
+
+    def yield_9square(self):
+        """ in ccw order """
+        for nbor in self.yield_8nbors():
+            yield nbor
+        yield self
 
     def yield_8nbors_rand(self):
         """ in random order """
@@ -200,13 +212,18 @@ class Grid2:
             for x in numpy.random.permutation(self.H):
                 yield (Int2(x,y), self.get(x,y))
 
-    def nbors4(self, p):
-        for nbor in p.yield_4nbors():
+    def nbors4(self, u):
+        for nbor in u.yield_4nbors():
             if self.check(nbor):
                 yield (nbor, self.pget(nbor))
 
-    def nbors4_rand(self, p):
-        for nbor in p.yield_4nbors_rand():
+    def nbors8(self, u):
+        for nbor in u.yield_8nbors():
+            if self.check(nbor):
+                yield (nbor, self.pget(nbor))
+
+    def nbors4_rand(self, u):
+        for nbor in u.yield_4nbors_rand():
             if self.check(nbor):
                 yield (nbor, self.pget(nbor))
 
@@ -327,6 +344,33 @@ class Grid2:
             value2cent[x] = (s.x*1.0/t, s.y*1.0/t)
 
         return value2cent
+
+    def separate(G, separator_value, exclude_cell):
+        H = Grid2(G.W, G.H, None)
+        for (u, p) in G.piter_rand():
+            H.pset(u, p)
+            if p == separator_value:
+                continue
+            if exclude_cell(u):
+                continue
+            for (v, q) in G.nbors8(u):
+                if q == separator_value:
+                    continue
+                elif p == q:
+                    continue
+                else:
+                    H.pset(u, separator_value)
+                    break
+        return H
+
+    def integer_supersample(G, factor):
+        S = factor
+        H = Grid2(G.W*S, G.H*S, None)
+
+        for (u, p) in H.piter():
+            H.pset(u, G.pget(u/S))
+
+        return H
 
 EDGE_TO_NORM = [
     Int2(1, 0),

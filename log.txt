@@ -32,7 +32,6 @@ issues with needy squidi algo:
     can often see key before seeing door.
     ok, just gonna be OK with this for now.
 
-----------------------------------------
 
 
 ok handle multiple heights...?
@@ -48,4 +47,37 @@ ok i guess we do need to support all 3 cases...
 2 is default, 3 doesn't work yet.
 
 seems like #2 should be the more rare case. like, explicity specify when you want these kind of walls. or jsut do it after the fact.
+should make the grid part have walls with area. ie two zones should not actually touch on the grid
+the super sampling is ok..but in general, i don't think we necessarily need to take that approach.
+i think the coarse-grid should serve as a logical grid, and should perhaps impose some critical path logic to guide the generators.
 
+critical path inside each zone. pick a "hub" spot, compute shortest path from each door to it, ensure that path is never blocked by per-zone algo
+    we can use PoE's perlin noise weighting to make crit paths more wiggly.
+
+addressing blockiness: we don't need to always use the zone grid to generate geometry. we only need to respect the boundaries it imposes. for example, we can do simplification, but still respect the boundaries and the critical paths.
+
+zone grid: stores info about zone boundaries and critical paths. general rule: you are not allowed to go outside your zone cells, and you're not allowed to go into the crit path by more than 1 cell.
+
+zone grid is the coarse grid, before the super-sampling/separation we do now. separation is a valid op.
+
+now we need to think about...how would we actually generate stuff in a free form manner? randomly placing items, decorations, etc.
+
+OBSERVATION: lower res initial grid results in more snaking zones. i guess finer blob spreading just results in pretty circular blobs..
+    ok this isn't necessarily something to worry about. the snaking-feeling should come from the zone-gen themselves.
+
+i tried the separation algorithm running on the non-zone-collated space tree. much more complex looking results
+
+----------------------------------------
+
+get Box2D for python!
+
+we can have various algorithms for filling space:
+- seed spread - 'shape grow' method
+    currently implemented as method2.
+- 'pile of pieces' shape-then-fit method.
+    ues box2D
+
+how can we get the tree for the shape-then-fit method?
+
+actually, using box2D may be overkill for the 'manmade' style. something much more procedural may be preferable. ie. generate a sequence of symmetric pieces in a tree order.
+    the shape-gen could be tunnel-like, symmetric piece, non-symmetric, etc.

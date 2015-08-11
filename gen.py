@@ -9,8 +9,9 @@ import sys
 from planar import Vec2
 from utils import *
 import dero_config
-import wad
 import noise
+import wad
+import minewad
 
 def testBasic():
     g = Grid2(80,80,' ')
@@ -227,13 +228,12 @@ def needy_squidi_keylock_algo(tree, spawn_node, exit_node, ideal_zone_size):
         lock = pick_min( eligible, score_func )
         if not lock:
             break
-# mark_needed(lock) # this is unnecessary
 
         # update and pick key location
         remaining = copy_graph_without_subtree(remaining, spawn_node, lock)
 
-# choose a location that is furthest from a needed node
-# this should approximately put keys far away from locks
+        # choose a location that is furthest from a needed node
+        # this should approximately put keys far away from locks
 
         def eval_dist_to_needed(node):
             count = 0
@@ -248,6 +248,29 @@ def needy_squidi_keylock_algo(tree, spawn_node, exit_node, ideal_zone_size):
         mark_needed(key)
 
         yield (key, lock)
+
+def remove_smallest_regions(G, fill_val, values, remove_ratio):
+    valSizes = []
+    for val in values:
+        valSize = (val, len([c for c in G.cells_with_value(val)]))
+        valSizes += [valSize]
+
+    valSizes.sort(key = lambda vs : vs[1])
+
+    numRemove = int(len(valSizes) * remove_ratio)
+
+    for i in range(numRemove):
+        val = valSizes[i][0]
+        G.replace( val, fill_val )
+        values.remove(val)
+
+    return values
+
+def save_grid_png(G, path):
+    pylab.figure()
+    G.show_image()
+    pylab.savefig(path)
+    pylab.close()
 
 def method2(L, numRegions):
     if not numRegions:
@@ -273,12 +296,24 @@ def method2(L, numRegions):
     seed_spread(space_vals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
-    print 'computing doors'
-    door_dict = G.value_adjacency()
+    save_grid_png(G, 'grid-pre-remove-spaces.png')
+
+    space_vals = remove_smallest_regions(G, ' ', space_vals, 0.5)
+
+    save_grid_png(G, 'grid-post-remove-spaces.png')
+
+    # save grid of spaces only
+    pylab.figure()
+    G.show_image()
+    pylab.savefig('grid-spaces.png')
+    pylab.close()
+
+    print 'computing space adjacency'
+    edge2cells = G.value_adjacency()
 
     # create graph rep
     adj_graph = nx.Graph()
-    for (a,b) in door_dict:
+    for (a,b) in edge2cells:
         if a == ' ':
             continue
         adj_graph.add_edge(a,b)
@@ -290,15 +325,15 @@ def method2(L, numRegions):
     print 'computing space tree'
     und_space_tree = nx.minimum_spanning_tree(adj_graph)
     # tree with the spawn node as the root
-    spawn_node = space_vals[0]
-    space_tree = nx.dfs_tree(und_space_tree, spawn_node)
+    spawn_space = space_vals[0]
+    space_tree = nx.dfs_tree(und_space_tree, spawn_space)
     nodepos = G.compute_centroids()
 
-    colors[spawn_node] = 'b'
-    labels[spawn_node] += 'SP'
+    colors[spawn_space] = 'b'
+    labels[spawn_space] += 'SP'
 
     # choose a random leaf to be the exit
-    sizes = eval_subtree_sizes(space_tree, spawn_node)
+    sizes = eval_subtree_sizes(space_tree, spawn_space)
     exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
     print 'exit node = ', exit_node
     colors[exit_node] = 'g'
@@ -312,19 +347,24 @@ def method2(L, numRegions):
 
     locks = []
     keys = []
+    space2zone = {}
 
-    def on_key(k):
+    def on_key_node(k):
         keys.append(k)
         colors[k] = 'y'
         labels[k] += ' K%d' % len(keys)
 
-    def on_gate(g):
+    def on_lock_node(g):
+        zoneid = len(locks)
         locks.append(g)
         colors[g] = 'r'
         labels[g] += ' G%d' % len(locks)
 
         for u in yield_dfs(space_tree, g, set()):
             colors[u] = 'r'
+
+            if u not in space2zone:
+                space2zone[u] = zoneid
         colors[g] = 'k'
 
     def write_state_png():
@@ -334,22 +374,52 @@ def method2(L, numRegions):
         pylab.ylim([0, L])
         draw_labels(space_tree)
         pylab.savefig('locks%d.png' % len(locks))
+        pylab.close()
 
     write_state_png()
 
     print 'start needy squidi..'
-    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_node, exit_node, numRegions/3):
-        on_key(key)
-        on_gate(lock)
+    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_space, exit_node, len(space_vals)/4):
+        on_key_node(key)
+        on_lock_node(lock)
         write_state_png()
 
-    # only keep the doors in the tree
-    # we can re-add some of these later too, if they don't break puzzle structure
-    reduced_doors = {}
-    for (a,b) in space_tree.edges():
-        reduced_doors[(a,b)] = door_dict[asc(a,b)]
+    # mark un-marked nodes as the last zone
+    for u in space_tree.nodes():
+        if u not in space2zone:
+            space2zone[u] = len(locks)
+    numzones = len(locks) + 1
 
-    return (G, locks, keys, space_tree, reduced_doors, spawn_node)
+    # draw the tree, labeling each node by its zone
+    pylab.figure()
+    nx.draw(space_tree, nodepos)
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
+    for node in space2zone:
+        zone = space2zone[node]
+        pylab.annotate( str(zone), xy=add2(nodepos[node], (-2, 3)) )
+    pylab.savefig('zoned-space-tree.png' )
+    pylab.close()
+
+    # we can re-add some of these later too, if they don't break puzzle structure
+
+    # make grid only reflective of the zones now
+    if False:
+        for val in space2zone:
+            G.replace(val, space2zone[val])
+
+        zone_adj2edge = {}
+        for (a,b) in space_tree.edges():
+            zoneA = space2zone[a]
+            zoneB = space2zone[b]
+            if zoneA != zoneB:
+                zone_adj2edge[asc(zoneA,zoneB)] = edge2cells[asc(a,b)]
+
+        return (G, [space2zone[lock] for lock in locks], [space2zone[key] for key in keys], zone_adj2edge, space2zone[spawn_space])
+    else:
+        # only include edges actually in the tree
+        tree_adjs = {edge:edge2cells[asc(edge[0], edge[1])] for edge in space_tree.edges()}
+        return (G, locks, keys, tree_adjs, spawn_space)
 
 def v_case():
     T = nx.DiGraph()
@@ -487,7 +557,7 @@ class MapGeoBuilder:
             else:
                 print 'creating sector for grid value %s' % p
                 sid = len(mapp.sectors)
-                sector = wad.Sector().fill([0, 100,      '-', '-',       128, 0, 0])
+                sector = wad.Sector().fill([0, 100,      '-', '-',       160, 0, 0])
                 mapp.sectors.append(sector)
                 val2sectorid[p] = sid
 
@@ -533,6 +603,26 @@ class MapGeoBuilder:
         sd_right.midtex = '-'
         sd_left.midtex = '-'
 
+    def relax_verts(s):
+        vert2nborIds = {}
+        for v in s.mapp.verts:
+            vert2nborIds[v] = []
+
+        for ld in s.mapp.linedefs:
+            v0 = s.mapp.verts[ld.vert0]
+            v1 = s.mapp.verts[ld.vert1]
+            vert2nborIds[v0] += [ld.vert1]
+            vert2nborIds[v1] += [ld.vert0]
+
+        for v in s.mapp.verts:
+            nborIds = vert2nborIds[v]
+            assert len(nborIds) >= 2
+
+            avgx = pylab.mean([s.mapp.verts[nid].x for nid in nborIds] + [v.x])
+            avgy = pylab.mean([s.mapp.verts[nid].y for nid in nborIds] + [v.y])
+            v.x = avgx
+            v.y = avgy
+
 # test_polygonate_2()
 # test_polygonate_perlin()
 
@@ -560,16 +650,38 @@ def read_texnames(path):
     with open(path, 'r') as f:
         return [line.strip() for line in f]
 
-def assign_debug_textures(mapp):
+def get_wrap(listt, idx):
+    return listt[ idx % len(listt) ]
+
+def assign_textures(mapp, builder):
+
+    zones = set([val.zone for val in builder.val2sectorid])
+
+    sec2zone = {}
+    for (cell, secid) in builder.val2sectorid.iteritems():
+        if secid in sec2zone:
+            assert sec2zone[secid] == cell.zone
+        else:
+            sec2zone[secid] = cell.zone
+
+    # choose a texture set for each zone
+    sets = minewad.read_texsets('texsets.txt')
+    zonetexs = { zone : random.choice(sets) for zone in zones }
 
     for (sid, sec) in id_iter(mapp.sectors):
-        sec.floor_pic = 'FLOOR0_1'
-        sec.ceil_pic = 'CEIL1_1'
+        zone = sec2zone[sid]
+        ts = zonetexs[zone]
+        sec.floor_pic = ts.floor
+        sec.ceil_pic = ts.ceil
 
     for sd in mapp.sidedefs:
-        sd.midtex = 'METAL'
-        sd.uppertex = 'PIPE2'
-        sd.lowertex = 'BROWN1'
+        sid = sd.sector
+        sec = mapp.sectors[sid]
+        zone = sec2zone[sid]
+        ts = zonetexs[zone]
+        sd.midtex = get_wrap(ts.sidetexs, 0)
+        sd.uppertex = get_wrap(ts.sidetexs, 1)
+        sd.lowertex = get_wrap(ts.sidetexs, 2)
 
     for ld in mapp.linedefs:
         if ld.sd_right != -1 and ld.sd_left != -1:
@@ -577,33 +689,37 @@ def assign_debug_textures(mapp):
             mapp.sidedefs[ld.sd_right].midtex = '-'
             mapp.sidedefs[ld.sd_left].midtex = '-'
 
-class CellData:
+class SynthCell:
     def __init__(s):
-        s.space = None
+        s.zone = None
         s.floorht = int(0)
         s.ceilht = int(100)
+        s.is_door = False
 
     def __str__(s):
-        return 'CellData, space=%s, [%d,%d]' % (str(s.space), s.floorht, s.ceilht)
+        return 'SynthCell, zone=%s, [%d,%d]' % (str(s.zone), s.floorht, s.ceilht)
 
-    def __eq__(s, other):
-        return s.space == other.space and s.floorht == other.floorht and s.ceilht == other.ceilht
+    def __eq__(s, t):
+        return s.zone == t.zone \
+            and s.floorht == t.floorht \
+            and s.ceilht == t.ceilht \
+            and s.is_door == t.is_door
 
-    def __ne__(s, other):
-        return not s.__eq__(other)
+    def __ne__(s, t):
+        return not s.__eq__(t)
 
     def __hash__(s):
-        return hash((s.space, s.floorht, s.ceilht))
+        return hash((s.zone, s.floorht, s.ceilht))
 
     @staticmethod
     def test():
-        d1 = CellData()
-        d2 = CellData()
-        d3 = CellData()
+        d1 = SynthCell()
+        d2 = SynthCell()
+        d3 = SynthCell()
 
-        d1.space = 'a'
-        d2.space = 'a'
-        d3.space = ' '
+        d1.zone = 'a'
+        d2.zone = 'a'
+        d3.zone = ' '
 
         assert d1 == d1
         assert d1 == d2
@@ -614,47 +730,93 @@ class CellData:
 
 if __name__ == '__main__':
 
-    CellData.test()
+    SynthCell.test()
 
     test_grid2map()
 
     L = int(sys.argv[1])
-    (G, locks, keys, space_tree, doors, spawn_node) = method2(L, int(sys.argv[2]))
+    (zone_grid, locks, keys, doors, spawn_zone) = method2(L, int(sys.argv[2]))
 
-    print 'draw space grid'
+    """
+    print 'draw zone grid'
     pylab.figure()
-    G.show_image()
-    # write adjacency positions too, ie. the doors from one space to the next
-    for (a,b) in doors:
-        (u,v) = doors[(a,b)]
+    zone_grid.show_image()
+    # write adjacency positions too, ie. the doors from one zone to the next
+    for ((a,b), (u,v)) in doors.iteritems():
         pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
-    pylab.savefig('grid.png')
+    pylab.savefig('grid-zones.png')
+    pylab.close()
+        """
+
+    fine_grid = zone_grid.integer_supersample(3)
+
+    # separate zones with unreachable fill
+    door_cells = set()
+    for ((a,b), (u,v)) in doors.iteritems():
+        door_cells.add(u)
+        door_cells.add(v)
+    fine_grid = fine_grid.separate(' ', lambda u : u/3 in door_cells)
+
+    pylab.figure()
+    fine_grid.show_image()
+    pylab.savefig('grid-separated-zones.png')
+    pylab.close()
 
     # create enhanced grid
-    G2 = Grid2(G.W, G.H, None)
-    for (u, p) in G.piter():
-        data = CellData()
-        data.space = p
-        G2.pset(u, data)
+    geo_grid = Grid2(fine_grid.W, fine_grid.H, None)
+    for (u, p) in fine_grid.piter():
+        data = SynthCell()
+        data.zone = p
+        geo_grid.pset(u, data)
 
-    # synth playable wad
-    scale = 6000/L
+# perlin noise heights
+        noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
+        ht = int((noiseval*0.5 + 0.5) * 5) * 16
+        data.floorht = ht
+        data.ceilht = ht + 256
 
-    spawnAreaCells = [c for c in G.cells_with_value(spawn_node)]
+    # mark door cells as separate sectors
+    for ((a,b), (u,v)) in doors.iteritems():
+        this_door_cells = []
+        for ofs in Int2(1,1).yield_9square():
+            this_door_cells.append(u*3 + ofs)
+            this_door_cells.append(v*3 + ofs)
+
+        floorhtsum = 0
+        firstzone = None
+        for w in this_door_cells:
+            c = geo_grid.pget(w)
+            c.is_door = True
+            firstzone = firstzone or c.zone
+            floorhtsum += c.floorht
+
+        floorht = int(floorhtsum*1.0/len(this_door_cells))
+        for w in this_door_cells:
+            c = geo_grid.pget(w)
+            c.zone = firstzone
+            c.floorht = floorht
+            c.ceilht = floorht + 128
+
+    spawnAreaCells = [c for c in fine_grid.cells_with_value(spawn_zone)]
 
     # poke some random holes in the spawn area
+    """
     for _ in range(25):
-        G2.pget( random.choice(spawnAreaCells) ).space = ' '
+        geo_grid.pget( random.choice(spawnAreaCells) ).zone = ' '
+        """
 
-    startcell = random.choice(spawnAreaCells)
     # raise start pos a bit
-    startdata = G2.pget(startcell)
+    startcell = random.choice(spawnAreaCells)
+    startdata = geo_grid.pget(startcell)
     startdata.floorht = 40
 
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
-    builder.synth_grid(G2, scale, lambda data : data.space == ' ')
-    assign_debug_textures(mapp)
+# scale = 4096/L
+    scale = 64
+    builder.synth_grid(geo_grid, scale, lambda data : data.zone == ' ')
+    builder.relax_verts()
+    assign_textures(mapp, builder)
 
     # transfer floor/ceil hts
     for data in builder.val2sectorid:
@@ -668,11 +830,14 @@ if __name__ == '__main__':
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)
+    """
 # jitter all verts a bit, to reveal dupes
     for v in mapp.verts:
         v.x += int(0.2*scale*(random.random()*2-1))
         v.y += int(0.2*scale*(random.random()*2-1))
-    wad.save_map_png(mapp, 'grid2mapgeo-test.png')
+    """
+
+# wad.save_map_png(mapp, 'grid2mapgeo-test.png')
 
     mapp.sanity_asserts()
 
