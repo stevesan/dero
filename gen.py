@@ -272,6 +272,73 @@ def save_grid_png(G, path):
     pylab.savefig(path)
     pylab.close()
 
+def setup_doors_presynth(geo_grid, doors):
+    for ((a,b), (u,v)) in doors.iteritems():
+        this_door_cells = []
+        for ofs in Int2(1,1).yield_9square():
+            this_door_cells.append(u*3 + ofs)
+            this_door_cells.append(v*3 + ofs)
+
+        floorhtsum = 0
+        zone = 'door(%s,%s)' % (a,b)
+        firstzone = None # use the same zone for both 'sides' of the door
+        for w in this_door_cells:
+            c = geo_grid.pget(w)
+            c.is_door = True
+            floorhtsum += c.floorht
+
+        floorht = int(floorhtsum*1.0/len(this_door_cells))
+        for w in this_door_cells:
+            c = geo_grid.pget(w)
+            c.zone = zone
+            c.floorht = floorht
+            c.ceilht = floorht + 128
+
+def setup_doors(mapp, doors):
+    # script up doors
+    door_secids = set()
+    for ((a,b), (u,v)) in doors.iteritems():
+        cell = geo_grid.pget(u*3)
+        if cell in builder.val2sectorid:
+            door_secids.add( builder.val2sectorid[cell] )
+        cell = geo_grid.pget(v*3)
+        if cell in builder.val2sectorid:
+            door_secids.add( builder.val2sectorid[cell] )
+
+    doortexs = []
+    with open('midtexs.txt') as f:
+        for line in f:
+            if 'DOOR' in line:
+                doortexs.append(line.strip())
+    assert len(doortexs) > 10
+
+    print door_secids
+    secid2doortex = {}
+    for secid in door_secids:
+        sec = mapp.sectors[secid]
+        sec.ceil_height = sec.floor_height
+        sec.tag = secid
+        sec.floor_pic = random.choice(doortexs)
+        sec.ceil_pic = random.choice(doortexs)
+        secid2doortex[secid] = random.choice(doortexs)
+
+    doorsds = []
+    for ld in mapp.linedefs:
+        def proc_sd(sdid, other_sdid):
+            sd = mapp.sidedefs[sdid]
+            if sd.sector in door_secids:
+                ld.function = 31
+                ld.tag = sd.sector
+                othersd = mapp.sidedefs[other_sdid]
+                tex = secid2doortex[sd.sector]
+                othersd.midtex = '-'
+                othersd.uppertex = tex
+                othersd.lowertex = tex
+                doorsds.append(sd)
+        proc_sd(ld.sd_left, ld.sd_right)
+        proc_sd(ld.sd_right, ld.sd_left)
+    print len(doorsds)
+
 def method2(L, numRegions):
     if not numRegions:
         numRegions = L*L/100
@@ -750,7 +817,7 @@ if __name__ == '__main__':
 
     fine_grid = zone_grid.integer_supersample(3)
 
-    # separate zones with unreachable fill
+    # separate zones with filler, but make sure to leave door cells alone.
     door_cells = set()
     for ((a,b), (u,v)) in doors.iteritems():
         door_cells.add(u)
@@ -770,32 +837,16 @@ if __name__ == '__main__':
         geo_grid.pset(u, data)
 
 # perlin noise heights
-        noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
-        ht = int((noiseval*0.5 + 0.5) * 5) * 16
+        if False:
+            noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
+            ht = int((noiseval*0.5 + 0.5) * 5) * 16
+        else:
+            ht = 0
         data.floorht = ht
         data.ceilht = ht + 256
 
     # mark door cells as separate sectors
-    for ((a,b), (u,v)) in doors.iteritems():
-        this_door_cells = []
-        for ofs in Int2(1,1).yield_9square():
-            this_door_cells.append(u*3 + ofs)
-            this_door_cells.append(v*3 + ofs)
-
-        floorhtsum = 0
-        firstzone = None
-        for w in this_door_cells:
-            c = geo_grid.pget(w)
-            c.is_door = True
-            firstzone = firstzone or c.zone
-            floorhtsum += c.floorht
-
-        floorht = int(floorhtsum*1.0/len(this_door_cells))
-        for w in this_door_cells:
-            c = geo_grid.pget(w)
-            c.zone = firstzone
-            c.floorht = floorht
-            c.ceilht = floorht + 128
+    setup_doors_presynth(geo_grid, doors)
 
     spawnAreaCells = [c for c in fine_grid.cells_with_value(spawn_zone)]
 
@@ -812,10 +863,10 @@ if __name__ == '__main__':
 
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
-# scale = 4096/L
+# scale = 4096/
     scale = 64
     builder.synth_grid(geo_grid, scale, lambda data : data.zone == ' ')
-    builder.relax_verts()
+# builder.relax_verts()
     assign_textures(mapp, builder)
 
     # transfer floor/ceil hts
@@ -827,6 +878,8 @@ if __name__ == '__main__':
 
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
+
+    setup_doors(mapp, doors)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)

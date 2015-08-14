@@ -69,6 +69,10 @@ i tried the separation algorithm running on the non-zone-collated space tree. mu
 
 ----------------------------------------
 
+door sectors next to another is not good. need to do the 3x1 separation
+get door side textures to stop scrolling?
+
+
 get Box2D for python!
 
 we can have various algorithms for filling space:
@@ -81,3 +85,4 @@ how can we get the tree for the shape-then-fit method?
 
 actually, using box2D may be overkill for the 'manmade' style. something much more procedural may be preferable. ie. generate a sequence of symmetric pieces in a tree order.
     the shape-gen could be tunnel-like, symmetric piece, non-symmetric, etc.
+

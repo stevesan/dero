@@ -564,7 +564,7 @@ def create_square_map(ref):
 
     rv.sectors = [
         Sector().fill([0, 100,  refsec.floor_pic, refsec.ceil_pic, 128, 0, 0]),
-        Sector().fill([16, 82,  refsec2.floor_pic, refsec2.ceil_pic, 128, 0, 0]),
+        Sector().fill([16, 16,  refsec2.floor_pic, refsec2.ceil_pic, 128, 0, 0]),
     ]
 
     exit_lds = [ld for ld in ref.linedefs if ld.function == 11]
@@ -578,14 +578,14 @@ def create_square_map(ref):
     print 'refsd2', refsd2
 
     rv.sidedefs = [
-        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
-        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
-        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]),
-        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, '-', 0]),
-        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, '-', 1]),
-        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]),
-        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]),
-        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]),
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]), # 0
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]), # 1
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]), # 2
+        SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, '-', 0]), # 3
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, '-', 1]), # 4
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]), # 5
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]), # 6
+        SideDef().fill([0, 0,   refsd2.uppertex, refsd2.lowertex, refsd2.midtex, 1]), # 7
         ]
 
     """
@@ -600,9 +600,9 @@ def create_square_map(ref):
         LineDef().fill([2, 3,   0, 0, 0,    0, -1]).set_flag('Impassible'),
         LineDef().fill([3, 0,   0, 0, 0,    1, -1]).set_flag('Impassible'),
         LineDef().fill([0, 1,   0, 0, 0,    2, -1]).set_flag('Impassible'),
-        LineDef().fill([1, 2,   0, 0, 0,    3, 4]).set_flag('Impassible').clear_flag('Impassible').set_flag('Two-sided'),
-        LineDef().fill([1, 4,   0, 0, 0,    5, -1]).set_flag('Impassible'),
-        LineDef().fill([4, 5,   0, 0, 0,    6, -1]).set_flag('Impassible'),
+        LineDef().fill([1, 2,   0, 31, 0,    3, 4]).set_flag('Impassible').clear_flag('Impassible').set_flag('Two-sided'),
+        LineDef().fill([1, 4,   0, 0, 0,    5, -1]).set_flag('Impassible').set_flag('Upper Unpegged'),
+        LineDef().fill([4, 5,   0, 0, 0,    6, -1]).set_flag('Impassible').set_flag('Lower Unpegged'),
         LineDef().fill([5, 2,   0, 0, 0,    7, -1]).set_flag('Impassible'),
         ]
 
@@ -613,6 +613,4 @@ def create_square_map(ref):
     return rv
 
 if __name__ == "__main__":
-# test_doom1_wad()
-    dump_all_maps(dero_config.DOOM1_WAD_PATH)
-    dump_all_maps(dero_config.DOOM2_WAD_PATH)
+    test_doom1_wad()
