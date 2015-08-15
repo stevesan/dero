@@ -66,12 +66,15 @@ OBSERVATION: lower res initial grid results in more snaking zones. i guess finer
     ok this isn't necessarily something to worry about. the snaking-feeling should come from the zone-gen themselves.
 
 i tried the separation algorithm running on the non-zone-collated space tree. much more complex looking results
+get door side textures to stop scrolling?
+    done with Lower Unpegged on adjacent linedefs
 
 ----------------------------------------
 
+sometimes doors don't open from a side. make sure all two-sided LDs are set to function 31
 door sectors next to another is not good. need to do the 3x1 separation
-get door side textures to stop scrolling?
 
+doors only rise up to neighboring heights or something. definitely need to isolate areas around them.
 
 get Box2D for python!
 

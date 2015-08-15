@@ -317,27 +317,30 @@ def setup_doors(mapp, doors):
     for secid in door_secids:
         sec = mapp.sectors[secid]
         sec.ceil_height = sec.floor_height
-        sec.tag = secid
-        sec.floor_pic = random.choice(doortexs)
-        sec.ceil_pic = random.choice(doortexs)
         secid2doortex[secid] = random.choice(doortexs)
 
-    doorsds = []
     for ld in mapp.linedefs:
         def proc_sd(sdid, other_sdid):
+            if sdid < 0 or sdid >= len(mapp.sidedefs):
+                return
             sd = mapp.sidedefs[sdid]
-            if sd.sector in door_secids:
+            if sd.sector not in door_secids:
+                return
+            ld.set_flag('Lower Unpegged')
+            tex = secid2doortex[sd.sector]
+            if ld.get_flag('Two-sided'):
                 ld.function = 31
-                ld.tag = sd.sector
+                assert other_sdid > 0 and other_sdid < len(mapp.sidedefs)
                 othersd = mapp.sidedefs[other_sdid]
-                tex = secid2doortex[sd.sector]
                 othersd.midtex = '-'
                 othersd.uppertex = tex
                 othersd.lowertex = tex
-                doorsds.append(sd)
+            else:
+                sd.midtex = tex
+                sd.uppertex = tex
+                sd.lowertex = tex
         proc_sd(ld.sd_left, ld.sd_right)
         proc_sd(ld.sd_right, ld.sd_left)
-    print len(doorsds)
 
 def method2(L, numRegions):
     if not numRegions:
@@ -837,7 +840,7 @@ if __name__ == '__main__':
         geo_grid.pset(u, data)
 
 # perlin noise heights
-        if False:
+        if True:
             noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
             ht = int((noiseval*0.5 + 0.5) * 5) * 16
         else:
@@ -866,7 +869,7 @@ if __name__ == '__main__':
 # scale = 4096/
     scale = 64
     builder.synth_grid(geo_grid, scale, lambda data : data.zone == ' ')
-# builder.relax_verts()
+    builder.relax_verts()
     assign_textures(mapp, builder)
 
     # transfer floor/ceil hts

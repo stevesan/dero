@@ -563,8 +563,8 @@ def create_square_map(ref):
     refsec2 = ref.sectors[ref_sec_id2]
 
     rv.sectors = [
-        Sector().fill([0, 100,  refsec.floor_pic, refsec.ceil_pic, 128, 0, 0]),
-        Sector().fill([16, 16,  refsec2.floor_pic, refsec2.ceil_pic, 128, 0, 0]),
+        Sector().fill([0, 100,  refsec.floor_pic, refsec.ceil_pic, 200, 0, 0]),
+        Sector().fill([16, 16,  refsec2.floor_pic, refsec2.ceil_pic, 200, 0, 0]),
     ]
 
     exit_lds = [ld for ld in ref.linedefs if ld.function == 11]
@@ -601,9 +601,9 @@ def create_square_map(ref):
         LineDef().fill([3, 0,   0, 0, 0,    1, -1]).set_flag('Impassible'),
         LineDef().fill([0, 1,   0, 0, 0,    2, -1]).set_flag('Impassible'),
         LineDef().fill([1, 2,   0, 31, 0,    3, 4]).set_flag('Impassible').clear_flag('Impassible').set_flag('Two-sided'),
-        LineDef().fill([1, 4,   0, 0, 0,    5, -1]).set_flag('Impassible').set_flag('Upper Unpegged'),
+        LineDef().fill([1, 4,   0, 0, 0,    5, -1]).set_flag('Impassible').set_flag('Lower Unpegged'),
         LineDef().fill([4, 5,   0, 0, 0,    6, -1]).set_flag('Impassible').set_flag('Lower Unpegged'),
-        LineDef().fill([5, 2,   0, 0, 0,    7, -1]).set_flag('Impassible'),
+        LineDef().fill([5, 2,   0, 0, 0,    7, -1]).set_flag('Impassible').set_flag('Lower Unpegged'),
         ]
 
     print 'FOO'
