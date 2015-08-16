@@ -274,17 +274,16 @@ def save_grid_png(G, path):
 
 def setup_doors_presynth(geo_grid, doors):
     for ((a,b), (u,v)) in doors.iteritems():
+        direction = v - u
         this_door_cells = []
-        for ofs in Int2(1,1).yield_9square():
-            this_door_cells.append(u*3 + ofs)
-            this_door_cells.append(v*3 + ofs)
+        this_door_cells.append(u*3 + Int2(1,1) + direction)
+        this_door_cells.append(v*3 + Int2(1,1) - direction)
 
         floorhtsum = 0
         zone = 'door(%s,%s)' % (a,b)
         firstzone = None # use the same zone for both 'sides' of the door
         for w in this_door_cells:
             c = geo_grid.pget(w)
-            c.is_door = True
             floorhtsum += c.floorht
 
         floorht = int(floorhtsum*1.0/len(this_door_cells))
@@ -297,12 +296,8 @@ def setup_doors_presynth(geo_grid, doors):
 def setup_doors(mapp, doors):
     # script up doors
     door_secids = set()
-    for ((a,b), (u,v)) in doors.iteritems():
-        cell = geo_grid.pget(u*3)
-        if cell in builder.val2sectorid:
-            door_secids.add( builder.val2sectorid[cell] )
-        cell = geo_grid.pget(v*3)
-        if cell in builder.val2sectorid:
+    for cell in builder.val2sectorid:
+        if 'door' in cell.zone:
             door_secids.add( builder.val2sectorid[cell] )
 
     doortexs = []
@@ -764,7 +759,6 @@ class SynthCell:
         s.zone = None
         s.floorht = int(0)
         s.ceilht = int(100)
-        s.is_door = False
 
     def __str__(s):
         return 'SynthCell, zone=%s, [%d,%d]' % (str(s.zone), s.floorht, s.ceilht)
@@ -772,8 +766,7 @@ class SynthCell:
     def __eq__(s, t):
         return s.zone == t.zone \
             and s.floorht == t.floorht \
-            and s.ceilht == t.ceilht \
-            and s.is_door == t.is_door
+            and s.ceilht == t.ceilht
 
     def __ne__(s, t):
         return not s.__eq__(t)
@@ -822,9 +815,11 @@ if __name__ == '__main__':
 
     # separate zones with filler, but make sure to leave door cells alone.
     door_cells = set()
+    """
     for ((a,b), (u,v)) in doors.iteritems():
         door_cells.add(u)
         door_cells.add(v)
+        """
     fine_grid = fine_grid.separate(' ', lambda u : u/3 in door_cells)
 
     pylab.figure()
@@ -867,7 +862,7 @@ if __name__ == '__main__':
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
 # scale = 4096/
-    scale = 64
+    scale = 96
     builder.synth_grid(geo_grid, scale, lambda data : data.zone == ' ')
     builder.relax_verts()
     assign_textures(mapp, builder)
