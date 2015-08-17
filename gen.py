@@ -315,27 +315,35 @@ def setup_doors(mapp, doors):
         secid2doortex[secid] = random.choice(doortexs)
 
     for ld in mapp.linedefs:
-        def proc_sd(sdid, other_sdid):
-            if sdid < 0 or sdid >= len(mapp.sidedefs):
-                return
-            sd = mapp.sidedefs[sdid]
-            if sd.sector not in door_secids:
-                return
-            ld.set_flag('Lower Unpegged')
-            tex = secid2doortex[sd.sector]
-            if ld.get_flag('Two-sided'):
+        rightside = mapp.sidedefs[ld.sd_right]
+        assert rightside
+
+        if ld.get_flag('Two-sided'):
+            # either side part of a door sector?
+            leftside = mapp.sidedefs[ld.sd_left]
+            assert leftside
+            doorsecid = None
+            if rightside.sector in door_secids:
+                doorsecid = rightside.sector
+                # need to flip the line around, so the right side is facing 'out'
+                # the player needs to interact with the right side
+                ld.flip_orientation()
+                t = leftside
+                leftside = rightside
+                rightside = t
+            elif leftside.sector in door_secids:
+                doorsecid = leftside.sector
+
+            if doorsecid:
                 ld.function = 31
-                assert other_sdid > 0 and other_sdid < len(mapp.sidedefs)
-                othersd = mapp.sidedefs[other_sdid]
-                othersd.midtex = '-'
-                othersd.uppertex = tex
-                othersd.lowertex = tex
-            else:
-                sd.midtex = tex
-                sd.uppertex = tex
-                sd.lowertex = tex
-        proc_sd(ld.sd_left, ld.sd_right)
-        proc_sd(ld.sd_right, ld.sd_left)
+                tex = secid2doortex[doorsecid]
+                rightside.uppertex = tex
+                rightside.lowertex = tex
+                assert rightside.midtex == '-'
+
+        elif rightside.sector in door_secids:
+            # the door lining
+            ld.set_flag('Lower Unpegged')
 
 def method2(L, numRegions):
     if not numRegions:

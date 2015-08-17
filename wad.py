@@ -210,6 +210,16 @@ class LineDef(SimpleStruct):
         s.flags &= ~(1 << n)
         return s
 
+    def flip_orientation(s):
+
+        t = s.vert0
+        s.vert0 = s.vert1
+        s.vert1 = t
+
+        t = s.sd_left
+        s.sd_left = s.sd_right
+        s.sd_right = t
+
 class SideDef(SimpleStruct):
 
     FIELDS = [
