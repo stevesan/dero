@@ -272,8 +272,11 @@ def save_grid_png(G, path):
     pylab.savefig(path)
     pylab.close()
 
-def setup_doors_presynth(geo_grid, doors):
+def setup_doors_presynth(voxel_grid, doors, locks):
+    print locks
+    print doors
     for ((a,b), (u,v)) in doors.iteritems():
+        locked = b in locks
         direction = v - u
         this_door_cells = []
         this_door_cells.append(u*3 + Int2(1,1) + direction)
@@ -281,24 +284,31 @@ def setup_doors_presynth(geo_grid, doors):
 
         floorhtsum = 0
         zone = 'door(%s,%s)' % (a,b)
+        if locked:
+            zone += '-locked'
+            print 'locked door', a, b, u, v
         firstzone = None # use the same zone for both 'sides' of the door
         for w in this_door_cells:
-            c = geo_grid.pget(w)
+            c = voxel_grid.pget(w)
             floorhtsum += c.floorht
 
         floorht = int(floorhtsum*1.0/len(this_door_cells))
         for w in this_door_cells:
-            c = geo_grid.pget(w)
+            c = voxel_grid.pget(w)
             c.zone = zone
             c.floorht = floorht
             c.ceilht = floorht + 128
 
-def setup_doors(mapp, doors):
+def setup_doors(mapp, builder, doors):
     # script up doors
     door_secids = set()
+    locked_secids = set()
     for cell in builder.val2sectorid:
+        secid = builder.val2sectorid[cell]
         if 'door' in cell.zone:
-            door_secids.add( builder.val2sectorid[cell] )
+            door_secids.add(secid)
+            if 'locked' in cell.zone:
+                locked_secids.add(secid)
 
     doortexs = []
     with open('midtexs.txt') as f:
@@ -335,7 +345,11 @@ def setup_doors(mapp, doors):
                 doorsecid = leftside.sector
 
             if doorsecid:
-                ld.function = 31
+                # this is bordering a door sector
+                if doorsecid in locked_secids:
+                    ld.function = 32
+                else:
+                    ld.function = 31
                 tex = secid2doortex[doorsecid]
                 rightside.uppertex = tex
                 rightside.lowertex = tex
@@ -382,11 +396,11 @@ def method2(L, numRegions):
     pylab.close()
 
     print 'computing space adjacency'
-    edge2cells = G.value_adjacency()
+    treeedge2cells = G.value_adjacency()
 
     # create graph rep
     adj_graph = nx.Graph()
-    for (a,b) in edge2cells:
+    for (a,b) in treeedge2cells:
         if a == ' ':
             continue
         adj_graph.add_edge(a,b)
@@ -414,7 +428,7 @@ def method2(L, numRegions):
 
     def draw_labels(graph):
         for node in graph.nodes():
-            pylab.annotate(labels[node], xy=add2(nodepos[node],(-2, 3)))
+            pylab.annotate(labels[node], xy=add2(nodepos[node],(-1, 2)))
 
 # DEFINITION: a lock node means, to get TO IT, requires a key.
 
@@ -474,10 +488,19 @@ def method2(L, numRegions):
     pylab.savefig('zoned-space-tree.png' )
     pylab.close()
 
+    # draw the non-zoned tree
+    pylab.figure()
+    nx.draw(space_tree, nodepos)
+    pylab.xlim([0, L])
+    pylab.ylim([0, L])
+    draw_labels(space_tree)
+    pylab.savefig('space-tree.png' )
+    pylab.close()
+
     # we can re-add some of these later too, if they don't break puzzle structure
 
-    # make grid only reflective of the zones now
     if False:
+        # make grid only reflective of the zones now
         for val in space2zone:
             G.replace(val, space2zone[val])
 
@@ -486,13 +509,13 @@ def method2(L, numRegions):
             zoneA = space2zone[a]
             zoneB = space2zone[b]
             if zoneA != zoneB:
-                zone_adj2edge[asc(zoneA,zoneB)] = edge2cells[asc(a,b)]
+                zone_adj2edge[asc(zoneA,zoneB)] = treeedge2cells[asc(a,b)]
 
         return (G, [space2zone[lock] for lock in locks], [space2zone[key] for key in keys], zone_adj2edge, space2zone[spawn_space])
     else:
         # only include edges actually in the tree
-        tree_adjs = {edge:edge2cells[asc(edge[0], edge[1])] for edge in space_tree.edges()}
-        return (G, locks, keys, tree_adjs, spawn_space)
+        doors = {edge:treeedge2cells[asc(edge[0], edge[1])] for edge in space_tree.edges()}
+        return (G, locks, keys, doors, spawn_space)
 
 def v_case():
     T = nx.DiGraph()
@@ -836,11 +859,11 @@ if __name__ == '__main__':
     pylab.close()
 
     # create enhanced grid
-    geo_grid = Grid2(fine_grid.W, fine_grid.H, None)
+    voxel_grid = Grid2(fine_grid.W, fine_grid.H, None)
     for (u, p) in fine_grid.piter():
         data = SynthCell()
         data.zone = p
-        geo_grid.pset(u, data)
+        voxel_grid.pset(u, data)
 
 # perlin noise heights
         if True:
@@ -852,26 +875,26 @@ if __name__ == '__main__':
         data.ceilht = ht + 256
 
     # mark door cells as separate sectors
-    setup_doors_presynth(geo_grid, doors)
+    setup_doors_presynth(voxel_grid, doors, locks)
 
     spawnAreaCells = [c for c in fine_grid.cells_with_value(spawn_zone)]
 
     # poke some random holes in the spawn area
     """
     for _ in range(25):
-        geo_grid.pget( random.choice(spawnAreaCells) ).zone = ' '
+        voxel_grid.pget( random.choice(spawnAreaCells) ).zone = ' '
         """
 
     # raise start pos a bit
     startcell = random.choice(spawnAreaCells)
-    startdata = geo_grid.pget(startcell)
+    startdata = voxel_grid.pget(startcell)
     startdata.floorht = 40
 
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
 # scale = 4096/
     scale = 96
-    builder.synth_grid(geo_grid, scale, lambda data : data.zone == ' ')
+    builder.synth_grid(voxel_grid, scale, lambda data : data.zone == ' ')
     builder.relax_verts()
     assign_textures(mapp, builder)
 
@@ -885,7 +908,7 @@ if __name__ == '__main__':
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
 
-    setup_doors(mapp, doors)
+    setup_doors(mapp, builder, doors)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)
