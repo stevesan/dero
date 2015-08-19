@@ -794,3 +794,10 @@ class GridVerts2:
 def id_iter(listt):
     for i in range(len(listt)):
         yield (i, listt[i])
+
+def flip(a,b):
+    return (b,a)
+
+def flip2(v):
+    return ( v[1], v[0] )
+

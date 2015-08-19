@@ -68,15 +68,20 @@ OBSERVATION: lower res initial grid results in more snaking zones. i guess finer
 i tried the separation algorithm running on the non-zone-collated space tree. much more complex looking results
 get door side textures to stop scrolling?
     done with Lower Unpegged on adjacent linedefs
+sometimes doors don't open from a side. make sure all two-sided LDs are set to function 31
+    must be right side!
+door sectors next to another is not good. need to do the 3x1 separation
+doors only rise up to neighboring heights or something. definitely need to isolate areas around them.
+get Box2D for python!
+    meh fuck it for now
+actually, using box2D may be overkill for the 'manmade' style. something much more procedural may be preferable. ie. generate a sequence of symmetric pieces in a tree order.
+    the shape-gen could be tunnel-like, symmetric piece, non-symmetric, etc.
 
 ----------------------------------------
 
-sometimes doors don't open from a side. make sure all two-sided LDs are set to function 31
-door sectors next to another is not good. need to do the 3x1 separation
-
-doors only rise up to neighboring heights or something. definitely need to isolate areas around them.
-
-get Box2D for python!
+critical path
+finer voxel grid for geometric detailing
+geo simplification
 
 we can have various algorithms for filling space:
 - seed spread - 'shape grow' method
@@ -86,6 +91,9 @@ we can have various algorithms for filling space:
 
 how can we get the tree for the shape-then-fit method?
 
-actually, using box2D may be overkill for the 'manmade' style. something much more procedural may be preferable. ie. generate a sequence of symmetric pieces in a tree order.
-    the shape-gen could be tunnel-like, symmetric piece, non-symmetric, etc.
+
+L-GRID
+GRAPH
+VOXEL-GRID
+MAP
 

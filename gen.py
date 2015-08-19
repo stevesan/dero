@@ -464,11 +464,11 @@ def method2(L, numRegions):
     pylab.close()
 
     print 'computing space adjacency'
-    treeedge2cells = G.value_adjacency()
+    graph2grid_edge_undirected = G.value_adjacency()
 
     # create graph rep
     adj_graph = nx.Graph()
-    for (a,b) in treeedge2cells:
+    for (a,b) in graph2grid_edge_undirected:
         if a == ' ':
             continue
         adj_graph.add_edge(a,b)
@@ -482,6 +482,15 @@ def method2(L, numRegions):
     # tree with the spawn node as the root
     spawn_space = space_vals[0]
     space_tree = nx.dfs_tree(und_space_tree, spawn_space)
+
+    # directed, from source to destination, in gameplay order
+    graph2grid_edge = {}
+    for edge in space_tree.edges():
+        if edge in graph2grid_edge_undirected:
+            graph2grid_edge[edge] = graph2grid_edge_undirected[edge]
+        elif flip2(edge) in graph2grid_edge_undirected:
+            graph2grid_edge[edge] = flip2(graph2grid_edge_undirected[flip2(edge)])
+
     nodepos = G.compute_centroids()
 
     colors[spawn_space] = 'b'
@@ -573,18 +582,16 @@ def method2(L, numRegions):
         for val in space2zone:
             G.replace(val, space2zone[val])
 
-        zone_adj2edge = {}
+        zone2grid_edge = {}
         for (a,b) in space_tree.edges():
             zoneA = space2zone[a]
             zoneB = space2zone[b]
             if zoneA != zoneB:
-                zone_adj2edge[asc(zoneA,zoneB)] = treeedge2cells[asc(a,b)]
+                zone2grid_edge[(zoneA,zoneB)] = graph2grid_edge[(a,b)]
 
-        return (G, [space2zone[lock] for lock in locks], [space2zone[key] for key in keys], zone_adj2edge, space2zone[spawn_space])
+        return (G, [space2zone[lock] for lock in locks], [space2zone[key] for key in keys], zone2grid_edge, space2zone[spawn_space])
     else:
-        # only include edges actually in the tree
-        doors = {edge:treeedge2cells[asc(edge[0], edge[1])] for edge in space_tree.edges()}
-        return (G, locks, keys, doors, spawn_space, exit_space)
+        return (G, locks, keys, graph2grid_edge, spawn_space, exit_space)
 
 def v_case():
     T = nx.DiGraph()
