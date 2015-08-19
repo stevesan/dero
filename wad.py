@@ -385,14 +385,8 @@ class LineDef(SimpleStruct):
         return s
 
     def flip_orientation(s):
-
-        t = s.vert0
-        s.vert0 = s.vert1
-        s.vert1 = t
-
-        t = s.sd_left
-        s.sd_left = s.sd_right
-        s.sd_right = t
+        (s.vert0, s.vert1) = (s.vert1, s.vert0)
+        (s.sd_right, s.sd_left) = (s.sd_left, s.sd_right)
 
 class SideDef(SimpleStruct):
 

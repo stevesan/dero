@@ -391,9 +391,7 @@ class PuzzleBuilder:
                 if need_flip:
                     # the player can only interact with the right side to open the door
                     ld.flip_orientation()
-                    t = leftside
-                    leftside = rightside
-                    rightside = t
+                    (leftside, rightside) = (rightside, leftside)
 
                 if is_door_interface:
 
