@@ -145,6 +145,12 @@ COLOR_TO_LINEDEF_FUNC = {
     'Y' : 34,
 }
 
+COLOR_TO_KEY_THING_TYPE = {
+    'B' : 5,
+    'R' : 13,
+    'Y' : 6,
+}
+
 class WADFile:
     """ Low-level operations for read/writing lumps, for reading and writing wads """
 
@@ -272,6 +278,13 @@ class LumpInfo(SimpleStruct):
 
 class Thing(SimpleStruct):
 
+    FLAGBIT = {
+       "Easy" : 0,
+       "Medium" : 1,
+       "Hard" : 2,
+       "Deaf" : 3,
+       "MultiplayerOnly" : 4 }
+
     FIELDS = [
     ('x', 'short'),
     ('y', 'short'),
@@ -281,6 +294,28 @@ class Thing(SimpleStruct):
     ]
 
     def get_fields(s): return Thing.FIELDS
+
+    def set_flag(s, flag):
+        assert flag in Thing.FLAGBIT
+        n = Thing.FLAGBIT[flag]
+        s.options |= 1 << n
+        return s
+
+    def get_flag(s, flag):
+        assert flag in Thing.FLAGBIT
+        n = Thing.FLAGBIT[flag]
+        return (s.options & 1 << n) > 0
+
+    def clear_flag(s, flag):
+        assert flag in Thing.FLAGBIT
+        n = Thing.FLAGBIT[flag]
+        s.options &= ~(1 << n)
+        return s
+
+    def set_all_difficulties(s):
+        s.set_flag('Easy')
+        s.set_flag('Medium')
+        return s.set_flag('Hard')
 
 class Vertex(SimpleStruct):
     FIELDS = [
@@ -444,11 +479,17 @@ class Map:
         return (dx, dy)
 
     def plot(s):
+        return s.plot(1.0)
+
+    def plot_partial(s, linechance):
 
         print 'plotting %d things, %d lines' % (len(s.things), len(s.linedefs))
         for t in s.things:
             pylab.plot([t.x], [t.y], '.'+get_color_for_thing(t.type))
+
         for ld in s.linedefs:
+            if random.random() > linechance:
+                continue
             p0 = s.verts[ld.vert0]
             p1 = s.verts[ld.vert1]
             color = 'k'
@@ -633,9 +674,12 @@ def save(path, header, lumps):
         io.write_array_lump(directory)
 
 
-def save_map_png(_map, fname):
+def save_map_png(mapp, fname):
+    return save_map_png_partial( mapp, fname, 1.0 )
+
+def save_map_png_partial(mapp, fname, linechance):
     pylab.figure()
-    _map.plot()
+    mapp.plot_partial(linechance)
     pylab.savefig(fname)
     print 'done plotting to %s' % fname
     pylab.close()

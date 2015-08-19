@@ -283,7 +283,6 @@ class PuzzleBuilder:
     def apply_doors_to_voxels(s, voxel_grid, doors, locks, keys):
 
         s.door2voxels = {}
-        s.cell2door = {}
 
         # make sure all cells under doors have same height and unique zone names
         for ((a,b), (u,v)) in doors.iteritems():
@@ -294,9 +293,6 @@ class PuzzleBuilder:
             ]
 
             s.door2voxels[(a,b)] = [voxel_grid.pget(w) for w in cells]
-            print s.door2voxels[(a,b)][0]
-            for vox in s.door2voxels[ (a,b) ]:
-                assert type(vox) == Voxel
 
             zone = 'door(%s,%s)' % (a,b)
             floorhtsum = sum([ voxel_grid.pget(w).floorht for w in cells])
@@ -307,7 +303,6 @@ class PuzzleBuilder:
                 c.zone = zone
                 c.floorht = floorht
                 c.ceilht = floorht
-                s.cell2door[c] = (a,b)
 
         # save state for next steps
 
@@ -318,6 +313,8 @@ class PuzzleBuilder:
 
         s.locks = locks
         s.keys = keys
+        s.voxel_grid = voxel_grid
+        s.doors = doors
 
     def read_door_texture_list(s):
         doortexs = []
@@ -339,7 +336,7 @@ class PuzzleBuilder:
                 else:
                     assert secid == builder.val2sectorid[voxel]
 
-    def apply_doors_to_map(s, mapp, builder, doors):
+    def apply_doors_to_map(s, mapp, builder, scale):
 
         s.assert_one_sector_per_door(builder)
 
@@ -413,6 +410,20 @@ class PuzzleBuilder:
             elif rightside.sector in secid2door:
                 # the door lining. make sure texture doesn't scroll when door animates open
                 ld.set_flag('Lower Unpegged')
+
+        # place keys
+        for i in range(len(s.keys)):
+            key = s.keys[i]
+            lock = s.locks[i]
+
+            cell = random.choice([cell for (cell, voxel) in s.voxel_grid.piter() if voxel.zone == key])
+            keytype = wad.COLOR_TO_KEY_THING_TYPE[ lock2color[lock] ]
+            mapp.things.append(wad.Thing().fill([
+                        int((cell.x+0.5)*scale),
+                        int((cell.y+0.5)*scale),
+                        0,
+                        keytype,
+                        0]).set_all_difficulties())
 
 def method2(L, numRegions):
     if not numRegions:
@@ -964,7 +975,7 @@ if __name__ == '__main__':
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
 
-    doorer.apply_doors_to_map(mapp, builder, doors)
+    doorer.apply_doors_to_map(mapp, builder, scale)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)
@@ -975,7 +986,7 @@ if __name__ == '__main__':
         v.y += int(0.2*scale*(random.random()*2-1))
     """
 
-# wad.save_map_png(mapp, 'grid2mapgeo-test.png')
+    wad.save_map_png_partial(mapp, 'final-map.png', 0.5)
 
     mapp.sanity_asserts()
 
@@ -986,6 +997,6 @@ if __name__ == '__main__':
 
     # readback
     actwad = wad.load('source.wad')
-# wad.save_map_png( actwad.maps[0], 'actual.png')
+    wad.save_map_png_partial( actwad.maps[0], 'read-back.png', 0.5)
 
 

@@ -372,6 +372,11 @@ class Grid2:
 
         return H
 
+    def select(G, use_value):
+        for (u, p) in G.piter():
+            if use_value(p):
+                yield (u, p)
+
 EDGE_TO_NORM = [
     Int2(1, 0),
     Int2(0, 1),
