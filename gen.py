@@ -282,27 +282,27 @@ class PuzzleBuilder:
 
     def apply_doors_to_voxels(s, voxel_grid, doors, locks, keys):
 
-        s.door2voxels = {}
+        s.door2voxel = {}
 
         # make sure all cells under doors have same height and unique zone names
         for ((a,b), (u,v)) in doors.iteritems():
             direction = v - u
-            cells = [
-                u*3 + Int2(1,1) + direction,
-                v*3 + Int2(1,1) - direction
-            ]
+            entercell = u*3 + Int2(1,1) + direction
+            doorcell = v*3 + Int2(1,1) - direction
 
-            s.door2voxels[(a,b)] = [voxel_grid.pget(w) for w in cells]
+            # dig entrance single-voxel tunnel
+            entervox = voxel_grid.pget(entercell)
+            entervox.zone = a
+            entervox.is_door = False
 
-            zone = 'door(%s,%s)' % (a,b)
-            floorhtsum = sum([ voxel_grid.pget(w).floorht for w in cells])
-            floorht = int(floorhtsum*1.0/len(cells))
+            # setup door voxel
+            doorvox = voxel_grid.pget(doorcell)
+            doorvox.zone = b
+            doorvox.is_door = True
+            doorvox.door_zones = (a,b)
+            doorvox.ceilht = doorvox.floorht
 
-            for w in cells:
-                c = voxel_grid.pget(w)
-                c.zone = zone
-                c.floorht = floorht
-                c.ceilht = floorht
+            s.door2voxel[(a,b)] = doorvox
 
         # save state for next steps
 
@@ -325,8 +325,9 @@ class PuzzleBuilder:
         assert len(doortexs) > 10
         return doortexs
 
+    """
     def assert_one_sector_per_door(s, builder):
-        for (door, voxels) in s.door2voxels.iteritems():
+        for (door, voxels) in s.door2voxel.iteritems():
             secid = None
             for voxel in voxels:
                 print voxel
@@ -335,21 +336,22 @@ class PuzzleBuilder:
                     secid = builder.val2sectorid[voxel]
                 else:
                     assert secid == builder.val2sectorid[voxel]
+            """
 
     def apply_doors_to_map(s, mapp, builder, scale):
 
-        s.assert_one_sector_per_door(builder)
+# s.assert_one_sector_per_door(builder)
 
         # create 1-to-1 maps of door to sector id
         secid2door = {}
-        for (door, voxels) in s.door2voxels.iteritems():
-            first_cell = voxels[0]
-            secid = builder.val2sectorid[first_cell]
+        for (door, vox) in s.door2voxel.iteritems():
+            print vox
+            secid = builder.val2sectorid[vox]
             secid2door[secid] = door
 
         # assign texture set to each door sector
         doortexs = s.read_door_texture_list()
-        door2tex = { door:random.choice(doortexs) for door in s.door2voxels }
+        door2tex = { door:random.choice(doortexs) for door in s.door2voxel }
 
         # choose a color for each lock
         colors = [c for c in wad.COLOR_TO_LINEDEF_FUNC]
@@ -487,10 +489,10 @@ def method2(L, numRegions):
 
     # choose a random leaf to be the exit
     sizes = eval_subtree_sizes(space_tree, spawn_space)
-    exit_node = random.choice( [u for u in sizes if sizes[u] == 1] )
-    print 'exit node = ', exit_node
-    colors[exit_node] = 'g'
-    labels[exit_node] += 'EX'
+    exit_space = random.choice( [u for u in sizes if sizes[u] == 1] )
+    print 'exit node = ', exit_space
+    colors[exit_space] = 'g'
+    labels[exit_space] += 'EX'
 
     def draw_labels(graph):
         for node in graph.nodes():
@@ -532,7 +534,7 @@ def method2(L, numRegions):
     write_state_png()
 
     print 'start needy squidi..'
-    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_space, exit_node, len(space_vals)/3):
+    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_space, exit_space, len(space_vals)/3):
         on_key_node(key)
         on_lock_node(lock)
         write_state_png()
@@ -559,7 +561,8 @@ def method2(L, numRegions):
     nx.draw(space_tree, nodepos)
     pylab.xlim([0, L])
     pylab.ylim([0, L])
-    draw_labels(space_tree)
+    for node in space_tree.nodes():
+        pylab.annotate(str(node), xy=add2(nodepos[node],(-1, 2)))
     pylab.savefig('space-tree.png' )
     pylab.close()
 
@@ -581,7 +584,7 @@ def method2(L, numRegions):
     else:
         # only include edges actually in the tree
         doors = {edge:treeedge2cells[asc(edge[0], edge[1])] for edge in space_tree.edges()}
-        return (G, locks, keys, doors, spawn_space)
+        return (G, locks, keys, doors, spawn_space, exit_space)
 
 def v_case():
     T = nx.DiGraph()
@@ -854,25 +857,32 @@ def assign_textures(mapp, builder):
 class Voxel(object):
     def __init__(s):
         s.zone = None
+        s.is_door = False
+        s.door_zones = None
         s.floorht = int(0)
         s.ceilht = int(100)
+    
+    def as_tuple(s):
+        return (s.zone, s.is_door, s.door_zones, s.floorht, s.ceilht)
 
     def __str__(s):
-        return 'Voxel, zone=%s, [%d,%d]' % (str(s.zone), s.floorht, s.ceilht)
+        return str(s.as_tuple())
 
     def __eq__(s, t):
-        return s.zone == t.zone \
-            and s.floorht == t.floorht \
-            and s.ceilht == t.ceilht
+        return s.as_tuple() == t.as_tuple()
 
     def __ne__(s, t):
         return not s.__eq__(t)
 
     def __hash__(s):
-        return hash((s.zone, s.floorht, s.ceilht))
+        return hash(s.as_tuple())
 
     @staticmethod
     def test():
+        Voxel.test_eq_ne()
+
+    @staticmethod
+    def test_eq_ne():
         d1 = Voxel()
         d2 = Voxel()
         d3 = Voxel()
@@ -887,7 +897,6 @@ class Voxel(object):
         assert d3 != d1
         assert d3 != d2
 
-
 if __name__ == '__main__':
 
     Voxel.test()
@@ -895,7 +904,7 @@ if __name__ == '__main__':
     test_grid2map()
 
     L = int(sys.argv[1])
-    (zone_grid, locks, keys, doors, spawn_zone) = method2(L, int(sys.argv[2]))
+    (zone_grid, locks, keys, doors, spawn_zone, exit_zone) = method2(L, int(sys.argv[2]))
 
     """
     print 'draw zone grid'
@@ -962,8 +971,12 @@ if __name__ == '__main__':
 # scale = 4096/
     scale = 96
     builder.synth_grid(voxel_grid, scale, lambda data : data.zone == ' ')
-    builder.relax_verts()
+# builder.relax_verts()
     assign_textures(mapp, builder)
+
+    zone2secid = {}
+    for (voxel, sid) in builder.val2sectorid.iteritems():
+        zone2secid[voxel.zone] = sid
 
     # transfer floor/ceil hts
     for data in builder.val2sectorid:
@@ -974,6 +987,17 @@ if __name__ == '__main__':
 
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
+
+    # add exit linedef
+    exitSid = zone2secid[exit_zone]
+    print exit_zone, exitSid
+    for ld in mapp.linedefs:
+        if ld.get_flag('Two-sided'):
+            continue
+        rightside = mapp.sidedefs[ld.sd_right]
+        if rightside.sector == exitSid:
+            ld.function = 11
+            rightside.midtex = 'SW1EXIT'
 
     doorer.apply_doors_to_map(mapp, builder, scale)
 
