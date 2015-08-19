@@ -272,92 +272,147 @@ def save_grid_png(G, path):
     pylab.savefig(path)
     pylab.close()
 
-def setup_doors_presynth(voxel_grid, doors, locks):
-    print locks
-    print doors
-    for ((a,b), (u,v)) in doors.iteritems():
-        locked = b in locks
-        direction = v - u
-        this_door_cells = []
-        this_door_cells.append(u*3 + Int2(1,1) + direction)
-        this_door_cells.append(v*3 + Int2(1,1) - direction)
+class PuzzleBuilder:
 
-        floorhtsum = 0
-        zone = 'door(%s,%s)' % (a,b)
-        if locked:
-            zone += '-locked'
-            print 'locked door', a, b, u, v
-        firstzone = None # use the same zone for both 'sides' of the door
-        for w in this_door_cells:
-            c = voxel_grid.pget(w)
-            floorhtsum += c.floorht
+    def __init__(s):
+        pass
 
-        floorht = int(floorhtsum*1.0/len(this_door_cells))
-        for w in this_door_cells:
-            c = voxel_grid.pget(w)
-            c.zone = zone
-            c.floorht = floorht
-            c.ceilht = floorht + 128
+    def is_door_locked(s, door):
+        return door[1] in s.locks
 
-def setup_doors(mapp, builder, doors):
-    # script up doors
-    door_secids = set()
-    locked_secids = set()
-    for cell in builder.val2sectorid:
-        secid = builder.val2sectorid[cell]
-        if 'door' in cell.zone:
-            door_secids.add(secid)
-            if 'locked' in cell.zone:
-                locked_secids.add(secid)
+    def apply_doors_to_voxels(s, voxel_grid, doors, locks, keys):
 
-    doortexs = []
-    with open('midtexs.txt') as f:
-        for line in f:
-            if 'DOOR' in line:
-                doortexs.append(line.strip())
-    assert len(doortexs) > 10
+        s.door2voxels = {}
+        s.cell2door = {}
 
-    print door_secids
-    secid2doortex = {}
-    for secid in door_secids:
-        sec = mapp.sectors[secid]
-        sec.ceil_height = sec.floor_height
-        secid2doortex[secid] = random.choice(doortexs)
+        # make sure all cells under doors have same height and unique zone names
+        for ((a,b), (u,v)) in doors.iteritems():
+            direction = v - u
+            cells = [
+                u*3 + Int2(1,1) + direction,
+                v*3 + Int2(1,1) - direction
+            ]
 
-    for ld in mapp.linedefs:
-        rightside = mapp.sidedefs[ld.sd_right]
-        assert rightside
+            s.door2voxels[(a,b)] = [voxel_grid.pget(w) for w in cells]
+            print s.door2voxels[(a,b)][0]
+            for vox in s.door2voxels[ (a,b) ]:
+                assert type(vox) == Voxel
 
-        if ld.get_flag('Two-sided'):
-            # either side part of a door sector?
-            leftside = mapp.sidedefs[ld.sd_left]
-            assert leftside
-            doorsecid = None
-            if rightside.sector in door_secids:
-                doorsecid = rightside.sector
-                # need to flip the line around, so the right side is facing 'out'
-                # the player needs to interact with the right side
-                ld.flip_orientation()
-                t = leftside
-                leftside = rightside
-                rightside = t
-            elif leftside.sector in door_secids:
-                doorsecid = leftside.sector
+            zone = 'door(%s,%s)' % (a,b)
+            floorhtsum = sum([ voxel_grid.pget(w).floorht for w in cells])
+            floorht = int(floorhtsum*1.0/len(cells))
 
-            if doorsecid:
-                # this is bordering a door sector
-                if doorsecid in locked_secids:
-                    ld.function = 32
+            for w in cells:
+                c = voxel_grid.pget(w)
+                c.zone = zone
+                c.floorht = floorht
+                c.ceilht = floorht
+                s.cell2door[c] = (a,b)
+
+        # save state for next steps
+
+        if len(locks) > 3:
+            locks = locks[0:3]
+            keys = keys[0:3]
+            print 'WARNING: truncating to only 3 locks:', locks
+
+        s.locks = locks
+        s.keys = keys
+
+    def read_door_texture_list(s):
+        doortexs = []
+        with open('midtexs.txt') as f:
+            for line in f:
+                if 'DOOR' in line:
+                    doortexs.append(line.strip())
+        assert len(doortexs) > 10
+        return doortexs
+
+    def assert_one_sector_per_door(s, builder):
+        for (door, voxels) in s.door2voxels.iteritems():
+            secid = None
+            for voxel in voxels:
+                print voxel
+                assert type(voxel) == Voxel
+                if not secid:
+                    secid = builder.val2sectorid[voxel]
                 else:
-                    ld.function = 31
-                tex = secid2doortex[doorsecid]
-                rightside.uppertex = tex
-                rightside.lowertex = tex
-                assert rightside.midtex == '-'
+                    assert secid == builder.val2sectorid[voxel]
 
-        elif rightside.sector in door_secids:
-            # the door lining
-            ld.set_flag('Lower Unpegged')
+    def apply_doors_to_map(s, mapp, builder, doors):
+
+        s.assert_one_sector_per_door(builder)
+
+        # create 1-to-1 maps of door to sector id
+        secid2door = {}
+        for (door, voxels) in s.door2voxels.iteritems():
+            first_cell = voxels[0]
+            secid = builder.val2sectorid[first_cell]
+            secid2door[secid] = door
+
+        # assign texture set to each door sector
+        doortexs = s.read_door_texture_list()
+        door2tex = { door:random.choice(doortexs) for door in s.door2voxels }
+
+        # choose a color for each lock
+        colors = [c for c in wad.COLOR_TO_LINEDEF_FUNC]
+        lock2color = {}
+        for lock in s.locks:
+            color = colors.pop()
+            lock2color[lock] = color
+
+        def get_color_for_door(door):
+            # the destination zone of the door is the one that is locked
+            return lock2color[ door[1] ]
+
+        # edit line defs
+        for ld in mapp.linedefs:
+            rightside = mapp.sidedefs[ld.sd_right]
+            assert rightside
+
+            if ld.get_flag('Two-sided'):
+
+                # either side part of a door sector?
+                leftside = mapp.sidedefs[ld.sd_left]
+                assert leftside
+
+                is_door_interface = False
+                need_flip = False
+                door = None
+
+                if rightside.sector in secid2door:
+                    is_door_interface = True
+                    need_flip = True
+                    door = secid2door[rightside.sector]
+                elif leftside.sector in secid2door:
+                    is_door_interface = True
+                    need_flip = False
+                    door = secid2door[leftside.sector]
+
+                if need_flip:
+                    # the player can only interact with the right side to open the door
+                    ld.flip_orientation()
+                    t = leftside
+                    leftside = rightside
+                    rightside = t
+
+                if is_door_interface:
+
+                    if s.is_door_locked(door):
+                        ld.function = wad.COLOR_TO_LINEDEF_FUNC[ get_color_for_door(door) ]
+                    else:
+                        # normal unlocked door
+                        ld.function = 31
+
+                    # TODO texture according to lock color
+                    tex = door2tex[door]
+                    rightside.uppertex = tex
+                    rightside.lowertex = tex
+                    rightside.midtex = '-'
+
+            elif rightside.sector in secid2door:
+                # the door lining. make sure texture doesn't scroll when door animates open
+                ld.set_flag('Lower Unpegged')
 
 def method2(L, numRegions):
     if not numRegions:
@@ -466,7 +521,7 @@ def method2(L, numRegions):
     write_state_png()
 
     print 'start needy squidi..'
-    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_space, exit_node, len(space_vals)/4):
+    for (key, lock) in needy_squidi_keylock_algo(space_tree, spawn_space, exit_node, len(space_vals)/3):
         on_key_node(key)
         on_lock_node(lock)
         write_state_png()
@@ -785,14 +840,14 @@ def assign_textures(mapp, builder):
             mapp.sidedefs[ld.sd_right].midtex = '-'
             mapp.sidedefs[ld.sd_left].midtex = '-'
 
-class SynthCell:
+class Voxel(object):
     def __init__(s):
         s.zone = None
         s.floorht = int(0)
         s.ceilht = int(100)
 
     def __str__(s):
-        return 'SynthCell, zone=%s, [%d,%d]' % (str(s.zone), s.floorht, s.ceilht)
+        return 'Voxel, zone=%s, [%d,%d]' % (str(s.zone), s.floorht, s.ceilht)
 
     def __eq__(s, t):
         return s.zone == t.zone \
@@ -807,9 +862,9 @@ class SynthCell:
 
     @staticmethod
     def test():
-        d1 = SynthCell()
-        d2 = SynthCell()
-        d3 = SynthCell()
+        d1 = Voxel()
+        d2 = Voxel()
+        d3 = Voxel()
 
         d1.zone = 'a'
         d2.zone = 'a'
@@ -824,7 +879,7 @@ class SynthCell:
 
 if __name__ == '__main__':
 
-    SynthCell.test()
+    Voxel.test()
 
     test_grid2map()
 
@@ -861,7 +916,7 @@ if __name__ == '__main__':
     # create enhanced grid
     voxel_grid = Grid2(fine_grid.W, fine_grid.H, None)
     for (u, p) in fine_grid.piter():
-        data = SynthCell()
+        data = Voxel()
         data.zone = p
         voxel_grid.pset(u, data)
 
@@ -875,7 +930,8 @@ if __name__ == '__main__':
         data.ceilht = ht + 256
 
     # mark door cells as separate sectors
-    setup_doors_presynth(voxel_grid, doors, locks)
+    doorer = PuzzleBuilder()
+    doorer.apply_doors_to_voxels(voxel_grid, doors, locks, keys)
 
     spawnAreaCells = [c for c in fine_grid.cells_with_value(spawn_zone)]
 
@@ -908,7 +964,7 @@ if __name__ == '__main__':
     # add player start
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
 
-    setup_doors(mapp, builder, doors)
+    doorer.apply_doors_to_map(mapp, builder, doors)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)

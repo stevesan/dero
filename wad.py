@@ -139,6 +139,12 @@ THING_TABLE = {
   23 : "0017 r SKUL k        Dead lost soul, invisible (they blow up when killed)",
 }
 
+COLOR_TO_LINEDEF_FUNC = {
+    'B' : 32,
+    'R' : 33,
+    'Y' : 34,
+}
+
 class WADFile:
     """ Low-level operations for read/writing lumps, for reading and writing wads """
 
