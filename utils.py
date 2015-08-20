@@ -351,7 +351,7 @@ class Grid2:
             H.pset(u, p)
             if p == separator_value:
                 continue
-            if exclude_cell(u):
+            if exclude_cell and exclude_cell(u):
                 continue
             for (v, q) in G.nbors8(u):
                 if q == separator_value:
@@ -376,6 +376,12 @@ class Grid2:
         for (u, p) in G.piter():
             if use_value(p):
                 yield (u, p)
+
+    def collect_touched_values(G, u):
+        touch_vals = set()
+        for (v,q) in G.nbors8(u):
+            touch_vals.add(q)
+        return touch_vals
 
 EDGE_TO_NORM = [
     Int2(1, 0),
@@ -452,15 +458,11 @@ def pick_random_from_set(s):
     return pick_random([x for x in s])
 
 class FrontManager:
-    grid = None
-    freevalue = None
-    frontcells = set()
-    invalues = None
-
     def __init__(self, grid, freevalue, invalues):
         self.grid = grid
         self.freevalue = freevalue
         self.invalues = invalues
+        self.frontcells = None
 
     def recompute(self):
         self.frontcells = set()
@@ -471,10 +473,7 @@ class FrontManager:
                     break
 
     def on_fill(self, u):
-        if self.grid.pget(u) == self.freevalue:
-            print 'ERROR'
-        if not self.grid.pget(u) not in self.freevalue:
-            print 'ERROR'
+        assert self.grid.pget(u) != self.freevalue
 
         if u in self.frontcells:
             self.frontcells.remove(u)
@@ -495,8 +494,7 @@ class FrontManager:
                 if y != self.freevalue:
                     found = True
                     break
-            if not found:
-                print 'ERROR: '+u
+            assert found
 
 def seed_spread(seedvals, sews, G, freevalue, max_spreads):
     seedvalset = set(seedvals)
@@ -504,43 +502,67 @@ def seed_spread(seedvals, sews, G, freevalue, max_spreads):
     front.recompute()
     front.check()
 
+    def only_touches_values(u, values):
+        for (v,q) in G.nbors8(u):
+            if q not in values:
+                return False
+        return True
+
     # initial seedings
     freespots = [x for x in G.cells_with_value(freevalue)]
     random.shuffle(freespots)
-    freeid = 0
     for sew in range(sews):
+        if len(freespots) == 0:
+            break
         for val in seedvals:
-            u = freespots[freeid]
-            freeid += 1
+            if len(freespots) == 0:
+                print 'WARNING: Ran out of free spots before seed sewing'
+                break
+            u = freespots.pop()
+            # make sure this keeps regions separate
+            while not only_touches_values(u, (freevalue,)):
+                u = freespots.pop()
             G.pset(u, val)
             front.on_fill(u)
+
     front.check()
+
+    sepvalue = '/'
+    assert sepvalue not in seedvalset
 
     # spread iteration
     spreads = 0
     while front.size() > 0 and spreads < max_spreads:
-        if spreads % 1000 == 0:
+        spreads += 1
+        if spreads % 10 == 0:
             print '%d/%d' % (spreads, max_spreads)
         # spread
         u = front.sample()
-        # choose a random region, which nbors this front cell, to spread to it
-        filled = False
-        for (v, val) in G.nbors4_rand(u):
-            if val in seedvalset:
-                G.pset(u, val)
+
+        # do NOT spread to this if it is separating
+        touched_regions = set()
+        for (v, q) in G.nbors8(u):
+            if q in seedvalset:
+                touched_regions.add(q)
+
+        if len(touched_regions) > 1:
+            # 'fill' this with a free value, and mark it as filled so no one uses this
+            G.pset(u, sepvalue)
+            front.on_fill(u)
+            continue
+
+        if len(touched_regions) == 0:
+            # must be bordering existing border or separator
+            continue
+
+        # ok, but we can only spread to a 4-nbor
+        for (v, q) in G.nbors4(u):
+            if q in seedvalset:
+                G.pset(u, q)
                 front.on_fill(u)
-                spreads += 1
-                filled = True
                 break
 
-        if not filled:
-            print 'ERROR!'
-            print u
-            for (v,val) in G.nbors4(u):
-                print v, val
-            print front.array
-            G.printself()
-            sys.exit(1)
+    G.replace(sepvalue, freevalue)
 
     return spreads
 

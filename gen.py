@@ -282,29 +282,13 @@ class PuzzleBuilder:
 
     def apply_doors_to_voxels(s, voxel_grid, doors, locks, keys):
 
-        s.door2voxel = {}
-
-        # make sure all cells under doors have same height and unique zone names
-        for ((a,b), (u,v)) in doors.iteritems():
-            direction = v - u
-            entercell = u*3 + Int2(1,1) + direction
-            doorcell = v*3 + Int2(1,1) - direction
-
-            # dig entrance single-voxel tunnel
-            entervox = voxel_grid.pget(entercell)
-            entervox.zone = a
-            entervox.is_door = False
-
-            # setup door voxel
-            doorvox = voxel_grid.pget(doorcell)
-            doorvox.zone = b
-            doorvox.is_door = True
-            doorvox.door_zones = (a,b)
+        for (pair, u) in doors.iteritems():
+            doorvox = voxel_grid.pget(u)
+            doorvox.zone = pair[0]
+            doorvox.door_pair = pair
             doorvox.ceilht = doorvox.floorht
 
-            s.door2voxel[(a,b)] = doorvox
-
-        # save state for next steps
+        # some simple lock stuff
 
         if len(locks) > 3:
             locks = locks[0:3]
@@ -325,33 +309,20 @@ class PuzzleBuilder:
         assert len(doortexs) > 10
         return doortexs
 
-    """
-    def assert_one_sector_per_door(s, builder):
-        for (door, voxels) in s.door2voxel.iteritems():
-            secid = None
-            for voxel in voxels:
-                print voxel
-                assert type(voxel) == Voxel
-                if not secid:
-                    secid = builder.val2sectorid[voxel]
-                else:
-                    assert secid == builder.val2sectorid[voxel]
-            """
-
     def apply_doors_to_map(s, mapp, builder, scale):
 
 # s.assert_one_sector_per_door(builder)
 
         # create 1-to-1 maps of door to sector id
         secid2door = {}
-        for (door, vox) in s.door2voxel.iteritems():
-            print vox
+        for (door, cell) in s.doors.iteritems():
+            vox = s.voxel_grid.pget(cell)
             secid = builder.val2sectorid[vox]
             secid2door[secid] = door
 
         # assign texture set to each door sector
         doortexs = s.read_door_texture_list()
-        door2tex = { door:random.choice(doortexs) for door in s.door2voxel }
+        door2tex = { door:random.choice(doortexs) for door in s.doors }
 
         # choose a color for each lock
         colors = [c for c in wad.COLOR_TO_LINEDEF_FUNC]
@@ -425,6 +396,23 @@ class PuzzleBuilder:
                         keytype,
                         0]).set_all_difficulties())
 
+def find_tunnels(G, space_vals):
+    pair2cell = {}
+    for (u,p) in G.piter_rand():
+        if p != ' ':
+            continue
+        touch_vals = G.collect_touched_values(u)
+        if ' ' in touch_vals:
+            touch_vals.remove(' ')
+
+        if len(touch_vals) == 2:
+            # valid door
+            touch_vals = [x for x in touch_vals]
+            pair = asc(touch_vals[0], touch_vals[1])
+            if pair not in pair2cell:
+                pair2cell[pair] = u
+    return pair2cell
+
 def method2(L, numRegions):
     if not numRegions:
         numRegions = L*L/100
@@ -461,12 +449,13 @@ def method2(L, numRegions):
     pylab.savefig('grid-spaces.png')
     pylab.close()
 
-    print 'computing space adjacency'
-    graph2grid_edge_undirected = G.value_adjacency()
+    print 'finding tunnels'
+    graphedge2tunnelcell = find_tunnels(G, space_vals)
+    assert len(graphedge2tunnelcell) > 0
 
     # create graph rep
     adj_graph = nx.Graph()
-    for (a,b) in graph2grid_edge_undirected:
+    for (a,b) in graphedge2tunnelcell:
         if a == ' ':
             continue
         adj_graph.add_edge(a,b)
@@ -480,14 +469,6 @@ def method2(L, numRegions):
     # tree with the spawn node as the root
     spawn_space = space_vals[0]
     space_tree = nx.dfs_tree(und_space_tree, spawn_space)
-
-    # directed, from source to destination, in gameplay order
-    graph2grid_edge = {}
-    for edge in space_tree.edges():
-        if edge in graph2grid_edge_undirected:
-            graph2grid_edge[edge] = graph2grid_edge_undirected[edge]
-        elif flip2(edge) in graph2grid_edge_undirected:
-            graph2grid_edge[edge] = flip2(graph2grid_edge_undirected[flip2(edge)])
 
     nodepos = G.compute_centroids()
 
@@ -575,21 +556,7 @@ def method2(L, numRegions):
 
     # we can re-add some of these later too, if they don't break puzzle structure
 
-    if False:
-        # make grid only reflective of the zones now
-        for val in space2zone:
-            G.replace(val, space2zone[val])
-
-        zone2grid_edge = {}
-        for (a,b) in space_tree.edges():
-            zoneA = space2zone[a]
-            zoneB = space2zone[b]
-            if zoneA != zoneB:
-                zone2grid_edge[(zoneA,zoneB)] = graph2grid_edge[(a,b)]
-
-        return (G, [space2zone[lock] for lock in locks], [space2zone[key] for key in keys], zone2grid_edge, space2zone[spawn_space])
-    else:
-        return (G, locks, keys, graph2grid_edge, spawn_space, exit_space)
+    return (G, locks, keys, graphedge2tunnelcell, spawn_space, exit_space)
 
 def v_case():
     T = nx.DiGraph()
@@ -862,13 +829,12 @@ def assign_textures(mapp, builder):
 class Voxel(object):
     def __init__(s):
         s.zone = None
-        s.is_door = False
-        s.door_zones = None
+        s.door_pair = None  # only used to distinguish between different doors
         s.floorht = int(0)
         s.ceilht = int(100)
     
     def as_tuple(s):
-        return (s.zone, s.is_door, s.door_zones, s.floorht, s.ceilht)
+        return (s.zone, s.door_pair, s.floorht, s.ceilht)
 
     def __str__(s):
         return str(s.as_tuple())
@@ -915,32 +881,15 @@ if __name__ == '__main__':
     print 'draw zone grid'
     pylab.figure()
     zone_grid.show_image()
-    # write adjacency positions too, ie. the doors from one zone to the next
-    for ((a,b), (u,v)) in doors.iteritems():
+    # write adjacency positions too, ie. the tunnels from one zone to the next
+    for ((a,b), (u,v)) in tunnels.iteritems():
         pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
     pylab.savefig('grid-zones.png')
     pylab.close()
         """
 
-    fine_grid = zone_grid.integer_supersample(3)
-
-    # separate zones with filler, but make sure to leave door cells alone.
-    door_cells = set()
-    """
-    for ((a,b), (u,v)) in doors.iteritems():
-        door_cells.add(u)
-        door_cells.add(v)
-        """
-    fine_grid = fine_grid.separate(' ', lambda u : u/3 in door_cells)
-
-    pylab.figure()
-    fine_grid.show_image()
-    pylab.savefig('grid-separated-zones.png')
-    pylab.close()
-
-    # create enhanced grid
-    voxel_grid = Grid2(fine_grid.W, fine_grid.H, None)
-    for (u, p) in fine_grid.piter():
+    voxel_grid = Grid2(zone_grid.W, zone_grid.H, None)
+    for (u, p) in zone_grid.piter():
         data = Voxel()
         data.zone = p
         voxel_grid.pset(u, data)
@@ -954,11 +903,10 @@ if __name__ == '__main__':
         data.floorht = ht
         data.ceilht = ht + 256
 
-    # mark door cells as separate sectors
     doorer = PuzzleBuilder()
     doorer.apply_doors_to_voxels(voxel_grid, doors, locks, keys)
 
-    spawnAreaCells = [c for c in fine_grid.cells_with_value(spawn_zone)]
+    spawnAreaCells = [c for c in zone_grid.cells_with_value(spawn_zone)]
 
     # poke some random holes in the spawn area
     """
