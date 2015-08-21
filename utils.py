@@ -377,9 +377,15 @@ class Grid2:
             if use_value(p):
                 yield (u, p)
 
-    def collect_touched_values(G, u):
+    def nbor8_values(G, u):
         touch_vals = set()
         for (v,q) in G.nbors8(u):
+            touch_vals.add(q)
+        return touch_vals
+
+    def nbor4_values(G, u):
+        touch_vals = set()
+        for (v,q) in G.nbors4(u):
             touch_vals.add(q)
         return touch_vals
 
@@ -639,6 +645,14 @@ def pick_min(items, score_func):
     return best
         
 def asc(a,b):
+    if b < a:
+        return (b, a)
+    else:
+        return (a, b)
+        
+def asc2(t):
+    a = t[0]
+    b = t[1]
     if b < a:
         return (b, a)
     else:

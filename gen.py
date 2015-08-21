@@ -272,7 +272,7 @@ def save_grid_png(G, path):
     pylab.savefig(path)
     pylab.close()
 
-class PuzzleBuilder:
+class DoorBuilder:
 
     def __init__(s):
         pass
@@ -396,22 +396,32 @@ class PuzzleBuilder:
                         keytype,
                         0]).set_all_difficulties())
 
-def find_tunnels(G, space_vals):
-    pair2cell = {}
+def find_doors(G, space_vals):
+    doors = {}
     for (u,p) in G.piter_rand():
         if p != ' ':
             continue
-        touch_vals = G.collect_touched_values(u)
-        if ' ' in touch_vals:
-            touch_vals.remove(' ')
+        touch8_vals = G.nbor8_values(u)
+        if ' ' in touch8_vals:
+            touch8_vals.remove(' ')
 
-        if len(touch_vals) == 2:
+        if len(touch8_vals) > 2:
+            # too many. much be a separating cell.
+            continue
+
+        # now see if we can make this a door. look at the 4-nbor touches
+        touch4_vals = G.nbor4_values(u)
+        if ' ' in touch4_vals:
+            touch4_vals.remove(' ')
+
+        if len(touch4_vals) == 2:
             # valid door
-            touch_vals = [x for x in touch_vals]
-            pair = asc(touch_vals[0], touch_vals[1])
-            if pair not in pair2cell:
-                pair2cell[pair] = u
-    return pair2cell
+            touch4_vals = [x for x in touch4_vals]
+            pair = asc(touch4_vals[0], touch4_vals[1])
+            if pair not in doors:
+                doors[pair] = u
+
+    return doors
 
 def method2(L, numRegions):
     if not numRegions:
@@ -443,19 +453,13 @@ def method2(L, numRegions):
 
     save_grid_png(G, 'grid-post-remove-spaces.png')
 
-    # save grid of spaces only
-    pylab.figure()
-    G.show_image()
-    pylab.savefig('grid-spaces.png')
-    pylab.close()
-
     print 'finding tunnels'
-    graphedge2tunnelcell = find_tunnels(G, space_vals)
-    assert len(graphedge2tunnelcell) > 0
+    doors = find_doors(G, space_vals)
+    assert len(doors) > 0
 
     # create graph rep
     adj_graph = nx.Graph()
-    for (a,b) in graphedge2tunnelcell:
+    for (a,b) in doors:
         if a == ' ':
             continue
         adj_graph.add_edge(a,b)
@@ -469,6 +473,13 @@ def method2(L, numRegions):
     # tree with the spawn node as the root
     spawn_space = space_vals[0]
     space_tree = nx.dfs_tree(und_space_tree, spawn_space)
+
+    # filter doors to tree edges only
+    temp = {}
+    for edge in space_tree.edges():
+        if asc2(edge) in doors:
+            temp[edge] = doors[asc2(edge)]
+    doors = temp
 
     nodepos = G.compute_centroids()
 
@@ -556,7 +567,7 @@ def method2(L, numRegions):
 
     # we can re-add some of these later too, if they don't break puzzle structure
 
-    return (G, locks, keys, graphedge2tunnelcell, spawn_space, exit_space)
+    return (G, locks, keys, doors, spawn_space, exit_space)
 
 def v_case():
     T = nx.DiGraph()
@@ -895,7 +906,7 @@ if __name__ == '__main__':
         voxel_grid.pset(u, data)
 
 # perlin noise heights
-        if True:
+        if False:
             noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
             ht = int((noiseval*0.5 + 0.5) * 5) * 16
         else:
@@ -903,7 +914,7 @@ if __name__ == '__main__':
         data.floorht = ht
         data.ceilht = ht + 256
 
-    doorer = PuzzleBuilder()
+    doorer = DoorBuilder()
     doorer.apply_doors_to_voxels(voxel_grid, doors, locks, keys)
 
     spawnAreaCells = [c for c in zone_grid.cells_with_value(spawn_zone)]
