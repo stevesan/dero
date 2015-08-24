@@ -77,8 +77,6 @@ get Box2D for python!
 actually, using box2D may be overkill for the 'manmade' style. something much more procedural may be preferable. ie. generate a sequence of symmetric pieces in a tree order.
     the shape-gen could be tunnel-like, symmetric piece, non-symmetric, etc.
 
-----------------------------------------
-
 critical path
 finer voxel grid for geometric detailing
 geo simplification
@@ -91,9 +89,21 @@ we can have various algorithms for filling space:
 
 how can we get the tree for the shape-then-fit method?
 
-
-L-GRID
-GRAPH
+ACCESS GRID
+    1 cell == player fits.
+    2 nboring free cells == player can move freely between both
+SPACE GRAPH
+    lock-key puzzles
 VOXEL-GRID
+    much finer grained grid for actually synthesizing the map
 MAP
+    the final DOOM geometry. linedefs, etc.
 
+----------------------------------------
+
+seeing key before door happens A LOT
+    mine minimaps to show keys and doors!
+
+paradigm:
+    shape algos can do whatever they want, but later on, the "tunneling algo" will use weighted-A-star to ensure paths.
+    AND, shape algos can define weights! ex. if you build a room with four walls and four POSSIBLE entrances, you should make the entrance voxels (1 per wall) have small weight compared to the rest of the wall voxels, so the pathing algo will be very likely to break one of those voxels.

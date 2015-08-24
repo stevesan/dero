@@ -906,7 +906,7 @@ if __name__ == '__main__':
         voxel_grid.pset(u, data)
 
 # perlin noise heights
-        if False:
+        if True:
             noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
             ht = int((noiseval*0.5 + 0.5) * 5) * 16
         else:
@@ -933,14 +933,15 @@ if __name__ == '__main__':
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
 # scale = 4096/
-    scale = 96
+    scale = 48
     builder.synth_grid(voxel_grid, scale, lambda data : data.zone == ' ')
 # builder.relax_verts()
-    assign_textures(mapp, builder)
 
-    zone2secid = {}
-    for (voxel, sid) in builder.val2sectorid.iteritems():
-        zone2secid[voxel.zone] = sid
+    secid2zone = {}
+    for (vox, secid) in builder.val2sectorid.iteritems():
+        secid2zone[ secid ] = vox.zone
+
+    assign_textures(mapp, builder)
 
     # transfer floor/ceil hts
     for data in builder.val2sectorid:
@@ -953,15 +954,13 @@ if __name__ == '__main__':
     mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
 
     # add exit linedef
-    exitSid = zone2secid[exit_zone]
-    print exit_zone, exitSid
     for ld in mapp.linedefs:
         if ld.get_flag('Two-sided'):
             continue
-        rightside = mapp.sidedefs[ld.sd_right]
-        if rightside.sector == exitSid:
+        rsd = mapp.sidedefs[ld.sd_right]
+        if secid2zone[rsd.sector] == exit_zone:
             ld.function = 11
-            rightside.midtex = 'SW1EXIT'
+            rsd.midtex = 'SW1EXIT'
 
     doorer.apply_doors_to_map(mapp, builder, scale)
 
