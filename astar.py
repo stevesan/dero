@@ -103,14 +103,17 @@ def test_grid_path():
         else:
             return 1
 
+    start = Int2(0,0)
+    target = Int2(L-1, L-1)
+
     def est_to_target(u):
-        return abs(L-1 - u.x) + abs(L-1 - u.y)
+        return Int2.manhattan_dist(u, target)
 
     G.printself()
     print '---'
 
     breaks = 0
-    for u in astar( Int2(0,0), Int2(L-1, L-1), get_nbors, edge_cost, est_to_target ):
+    for u in astar( start, target, get_nbors, edge_cost, est_to_target ):
         if G.pget(u) == BLOCK:
             G.pset(u, 'X')
             breaks += 1

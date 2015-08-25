@@ -128,6 +128,10 @@ class Int2:
                 int(math.floor(v2.x)),
                 int(math.floor(v2.y)) )
 
+    @staticmethod
+    def manhattan_dist(u, v):
+        return abs(v.x - u.x) + abs(v.y - u.y)
+
 class Grid2:
     def __init__(self,_W, _H, default):
         self.W = _W
