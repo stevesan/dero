@@ -294,7 +294,7 @@ class DummyLump():
 
 def get_color_for_thing(thing_type):
     type_desc = THING_TABLE[thing_type].lower()
-    if 'Player 1 start' in type_desc:
+    if 'player' in type_desc and 'start' in type_desc:
         return 'g'
     if 'key' in type_desc:
         if 'blue' in type_desc:
@@ -307,7 +307,19 @@ def get_color_for_thing(thing_type):
             print type_desc
             return 'y'
     else:
-        return '0.5'
+        return None
+
+def get_color_for_linedef(ld):
+    if ld.function in (26, 32):
+        return 'b'
+    elif ld.function in (28, 33):
+        return 'r'
+    elif ld.function in (27, 34):
+        return 'y'
+    elif ld.get_flag('Two-sided'):
+        return '0.8'
+    else:
+        return 'k'
 
 class ArrayLump:
 
@@ -359,18 +371,16 @@ class Map:
 
         print 'plotting %d things, %d lines' % (len(s.things), len(s.linedefs))
         for t in s.things:
-            pylab.plot([t.x], [t.y], '.', color=get_color_for_thing(t.type))
+            color = get_color_for_thing(t.type)
+            if color:
+                pylab.plot([t.x], [t.y], '.', color=color)
 
         for ld in s.linedefs:
             if random.random() > linechance:
                 continue
             p0 = s.verts[ld.vert0]
             p1 = s.verts[ld.vert1]
-            color = 'k'
-            if ld.sd_right >= 0 and ld.sd_left >= 0:
-                assert ld.get_flag('Two-sided')
-                color = '0.8'
-            pylab.plot( [p0.x, p1.x], [p0.y, p1.y], '-', color=color )
+            pylab.plot( [p0.x, p1.x], [p0.y, p1.y], '-', color=get_color_for_linedef(ld) )
 
         # make it square
         xx = [v.x for v in s.verts]
@@ -554,7 +564,7 @@ def save_map_png(mapp, fname):
 def save_map_png_partial(mapp, fname, linechance):
     pylab.figure()
     mapp.plot_partial(linechance)
-    pylab.savefig(fname)
+    pylab.savefig(fname, size=(5,5))
     print 'done plotting to %s' % fname
     pylab.close()
 

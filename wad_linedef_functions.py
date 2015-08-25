@@ -1,7 +1,8 @@
 
 LINEDEF_FUNCTIONS = {
 }
-    """
+
+LINEDEF_SPEC_TEXT = """
 Val   Class Act  Sound Speed Tm Chg Effect
 
 SPECIAL (Continuous effect, doesn't need triggereing)
@@ -179,3 +180,11 @@ LIGHT
 138 * Light  SR  clunk -     -  -   255
 139 * Light  SR  clunk -     -  -   0
 """
+
+def parse_spec():
+    state = 'header'
+    for line in LINEDEF_SPEC_TEXT.split('\n'):
+        line = line.replace('\n', '')
+        if state == 'header':
+            if line.str
+
