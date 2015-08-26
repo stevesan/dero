@@ -132,6 +132,12 @@ class Int2:
     def manhattan_dist(u, v):
         return abs(v.x - u.x) + abs(v.y - u.y)
 
+    @staticmethod
+    def euclidian_dist(u, v):
+        dx = v.x - u.x
+        dy = v.y - u.y
+        return math.sqrt(dx*dx + dy*dy)
+
 class Grid2:
     def __init__(self,_W, _H, default):
         self.W = _W
@@ -212,9 +218,10 @@ class Grid2:
                 yield (Int2(x,y), self.get(x,y))
 
     def piter_rand(self):
-        for y in numpy.random.permutation(self.W):
-            for x in numpy.random.permutation(self.H):
-                yield (Int2(x,y), self.get(x,y))
+        for idx in numpy.random.permutation(self.W * self.H):
+            y = idx / self.W
+            x = idx % self.W
+            yield (Int2(x,y), self.get(x,y))
 
     def nbors4(self, u):
         for nbor in u.yield_4nbors():
@@ -841,3 +848,9 @@ def flip(a,b):
 def flip2(v):
     return ( v[1], v[0] )
 
+def plot_to_png(pngf):
+    pylab.figure()
+    yield None
+    pylab.grid(True)
+    pylab.savefig(pngf)
+    pylab.close()

@@ -12,6 +12,7 @@ import dero_config
 import noise
 import wad
 import minewad
+import astar
 
 def testBasic():
     g = Grid2(80,80,' ')
@@ -457,6 +458,13 @@ def method2(L, numRegions):
     doors = find_doors(G, space_vals)
     assert len(doors) > 0
 
+    # remove unused
+    used_val_set = set([a for (a,b) in doors] + [b for (a,b) in doors])
+    for val in space_vals:
+        if val not in used_val_set:
+            G.replace(val, ' ')
+    space_vals = [v for v in used_val_set]
+
     # create graph rep
     adj_graph = nx.Graph()
     for (a,b) in doors:
@@ -545,25 +553,21 @@ def method2(L, numRegions):
     numzones = len(locks) + 1
 
     # draw the tree, labeling each node by its zone
-    pylab.figure()
-    nx.draw(space_tree, nodepos)
-    pylab.xlim([0, L])
-    pylab.ylim([0, L])
-    for node in space2zone:
-        zone = space2zone[node]
-        pylab.annotate( str(zone), xy=add2(nodepos[node], (-2, 3)) )
-    pylab.savefig('zoned-space-tree.png' )
-    pylab.close()
+    for _ in plot_to_png('zoned-space-tree.png'):
+        nx.draw(space_tree, nodepos)
+        pylab.xlim([0, L])
+        pylab.ylim([0, L])
+        for node in space2zone:
+            zone = space2zone[node]
+            pylab.annotate( str(zone), xy=add2(nodepos[node], (-2, 3)) )
 
     # draw the non-zoned tree
-    pylab.figure()
-    nx.draw(space_tree, nodepos)
-    pylab.xlim([0, L])
-    pylab.ylim([0, L])
-    for node in space_tree.nodes():
-        pylab.annotate(str(node), xy=add2(nodepos[node],(-1, 2)))
-    pylab.savefig('space-tree.png' )
-    pylab.close()
+    for _ in plot_to_png('space-tree.png'):
+        nx.draw(space_tree, nodepos)
+        pylab.xlim([0, L])
+        pylab.ylim([0, L])
+        for node in space_tree.nodes():
+            pylab.annotate(str(node), xy=add2(nodepos[node],(-1, 2)))
 
     # we can re-add some of these later too, if they don't break puzzle structure
 
@@ -879,6 +883,53 @@ class Voxel(object):
         assert d3 != d1
         assert d3 != d2
 
+def make_pillars(voxel_grid):
+    total = voxel_grid.W * voxel_grid.H / 40
+    count = 0
+    for (u,p) in voxel_grid.piter_rand():
+        p = voxel_grid.pget(u)
+        if count >= total: break
+        if p.zone != ' ' and p.door_pair == None:
+            p.zone = ' '
+            count += 1
+
+def clear_paths(V, Z, doors):
+    zones = set()
+    zone2cells = {}
+    for (u,zone) in Z.piter():
+        if zone == ' ':
+            continue
+        if zone not in zone2cells:
+            zone2cells[zone] = []
+        zone2cells[zone].append(u)
+
+    for (zone, cells) in zone2cells.iteritems():
+        assert len(cells) > 0
+        hub = random.choice(cells)
+
+        def yield_nbors(u):
+            print u
+            for (v,q) in Z.nbors4(u):
+                if q == zone:
+                    yield v
+
+        def edge_cost(u,v):
+            if V.pget(u).zone != zone:
+                return 999
+            else:
+                return 1
+
+        def est_to_target(u):
+            return Int2.euclidian_dist(u, hub)
+
+        for (doorzones, doorcell) in doors.iteritems():
+            if zone in doorzones:
+                print 'zone ' + zone + ' astarring from ' + str(hub) + ' to ' + str(doorcell)
+                for u in astar.astar(doorcell, hub, yield_nbors, edge_cost, est_to_target):
+                    # override whatever is here and force it to be this zone
+                    # this is the "digging"
+                    V.pget(u).zone = zone
+
 if __name__ == '__main__':
 
     Voxel.test()
@@ -917,25 +968,30 @@ if __name__ == '__main__':
     doorer = DoorBuilder()
     doorer.apply_doors_to_voxels(voxel_grid, doors, locks, keys)
 
+    # random pillars
+    make_pillars(voxel_grid)
+
+    if False:
+        # make all solid
+        for (u, p) in voxel_grid.piter():
+            if p.door_pair == None:
+                p.zone = ' '
+
+    clear_paths(voxel_grid, zone_grid, doors)
+
     spawnAreaCells = [c for c in zone_grid.cells_with_value(spawn_zone)]
-
-    # poke some random holes in the spawn area
-    """
-    for _ in range(25):
-        voxel_grid.pget( random.choice(spawnAreaCells) ).zone = ' '
-        """
-
-    # raise start pos a bit
     startcell = random.choice(spawnAreaCells)
+    # raise start pos a bit
     startdata = voxel_grid.pget(startcell)
     startdata.floorht = 40
 
+
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
-# scale = 4096/
+    # scale = 4096/
     scale = 48
     builder.synth_grid(voxel_grid, scale, lambda data : data.zone == ' ')
-# builder.relax_verts()
+    # builder.relax_verts()
 
     secid2zone = {}
     for (vox, secid) in builder.val2sectorid.iteritems():
@@ -983,7 +1039,8 @@ if __name__ == '__main__':
     dero_config.build_wad( 'source.wad', 'built-playable.wad' )
 
     # readback
-    actwad = wad.load('source.wad')
-    wad.save_map_png_partial( actwad.maps[0], 'read-back.png', 0.5)
+    if False:
+        actwad = wad.load('source.wad')
+        wad.save_map_png_partial( actwad.maps[0], 'read-back.png', 0.5)
 
 

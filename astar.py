@@ -43,7 +43,7 @@ class HeapQueue(object):
                 return item
         raise KeyError('pop from an empty priority queue')
 
-def astar(start, target, get_nbors, edge_cost, est_to_target):
+def astar(start, target, yield_nbors, edge_cost, est_to_target):
 
     cost_to = {}
     prev = {}
@@ -55,7 +55,7 @@ def astar(start, target, get_nbors, edge_cost, est_to_target):
     prev[u] = None
 
     while u != target:
-        for v in get_nbors(u):
+        for v in yield_nbors(u):
             if v in processed:
                 continue
             suv = cost_to[u] + edge_cost(u,v)
@@ -74,7 +74,7 @@ def astar(start, target, get_nbors, edge_cost, est_to_target):
             # done!
             break
 
-    # now yield the best path
+    # now yield the best path backwards
     u = target
     while u:
         yield u
@@ -89,11 +89,12 @@ def test_grid_path():
     G = Grid2(L, L, ' ')
     xofs = random() * 10.0
     yofs = random() * 10.0
+    thresh = -0.5 + random()*1.0
     for (u,p) in G.piter():
-        if noise.pnoise2(u.x*10.0/L + xofs, u.y*10.0/L + yofs) < 0:
+        if noise.pnoise2(u.x*10.0/L + xofs, u.y*10.0/L + yofs) < thresh:
             G.pset(u, BLOCK)
 
-    def get_nbors(u):
+    def yield_nbors(u):
         for v in G.nbors4(u):
             yield v[0]
 
@@ -107,13 +108,13 @@ def test_grid_path():
     target = Int2(L-1, L-1)
 
     def est_to_target(u):
-        return Int2.manhattan_dist(u, target)
+        return Int2.euclidian_dist(u, target)
 
     G.printself()
     print '---'
 
     breaks = 0
-    for u in astar( start, target, get_nbors, edge_cost, est_to_target ):
+    for u in astar( start, target, yield_nbors, edge_cost, est_to_target ):
         if G.pget(u) == BLOCK:
             G.pset(u, 'X')
             breaks += 1
