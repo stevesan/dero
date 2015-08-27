@@ -101,9 +101,8 @@ MAP
 seeing key before door happens A LOT
     mine minimaps to show keys and doors!
 
-----------------------------------------
-
 color doors in wad dumps
+----------------------------------------
 
 paradigm:
     shape algos can do whatever they want, but later on, the "tunneling algo" will use weighted-A-star to ensure paths.

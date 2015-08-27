@@ -281,11 +281,12 @@ class DoorBuilder:
     def is_door_locked(s, door):
         return door[1] in s.locks
 
-    def apply_doors_to_voxels(s, voxel_grid, doors, locks, keys):
+    def apply_doors_to_voxels(s, voxel_grid, zone_grid, doors, locks, keys):
 
         for (pair, u) in doors.iteritems():
             doorvox = voxel_grid.pget(u)
-            doorvox.zone = pair[0]
+            # use entering zone as material
+            doorvox.material = pair[0]
             doorvox.door_pair = pair
             doorvox.ceilht = doorvox.floorht
 
@@ -299,6 +300,7 @@ class DoorBuilder:
         s.locks = locks
         s.keys = keys
         s.voxel_grid = voxel_grid
+        s.zone_grid = zone_grid
         s.doors = doors
 
     def read_door_texture_list(s):
@@ -388,7 +390,9 @@ class DoorBuilder:
             key = s.keys[i]
             lock = s.locks[i]
 
-            cell = random.choice([cell for (cell, voxel) in s.voxel_grid.piter() if voxel.zone == key])
+            cell = random.choice([ \
+                    cell for (cell, zone) in s.zone_grid.piter() \
+                    if zone == key and s.voxel_grid.pget(cell).material != None])
             keytype = wad.COLOR_TO_KEY_THING_TYPE[ lock2color[lock] ]
             mapp.things.append(wad.Thing().fill([
                         int((cell.x+0.5)*scale),
@@ -665,6 +669,7 @@ class MapGeoBuilder:
         s.mapp = mapp
 
     def reset(s, G):
+        s.sectorgrid = Grid2(G.W, G.H, None)
         s.val2sectorid = {}
         s.vid2uses = {}
         s.vertids = GridVerts2(G.W, G.H, None)
@@ -673,7 +678,7 @@ class MapGeoBuilder:
     def get_linedef_id(s, u, v):
         return s.lineids.get_between(u, v)
 
-    def synth_grid(s, G, scale, is_unreachable):
+    def synth_grid(s, G, scale, is_unreachable, same_sector):
         s.reset(G)
 
         mapp = s.mapp
@@ -718,7 +723,7 @@ class MapGeoBuilder:
                 if not G.check(v):
                     continue
                 q = G.pget(v)
-                if p != q:
+                if not same_sector(p, q):
                     # check if linedef here already
                     lid = s.lineids.get(u, edge)
                     if lid == None:
@@ -784,7 +789,7 @@ def test_grid2map():
     scale = 100.0
     m = wad.Map('E1M1')
     builder = MapGeoBuilder(m)
-    builder.synth_grid(G, scale, lambda x : x == 0)
+    builder.synth_grid(G, scale, lambda x : x == 0, lambda u,v: u == v)
     assert len(m.verts) == 4
     assert len(m.linedefs) == 4
     assert len(m.sidedefs) == 4
@@ -807,30 +812,30 @@ def get_wrap(listt, idx):
 
 def assign_textures(mapp, builder):
 
-    zones = set([val.zone for val in builder.val2sectorid])
+    materials = set([val.material for val in builder.val2sectorid])
 
-    sec2zone = {}
-    for (cell, secid) in builder.val2sectorid.iteritems():
-        if secid in sec2zone:
-            assert sec2zone[secid] == cell.zone
+    sec2material = {}
+    for (vox, secid) in builder.val2sectorid.iteritems():
+        if secid in sec2material:
+            assert sec2material[secid] == vox.material
         else:
-            sec2zone[secid] = cell.zone
+            sec2material[secid] = vox.material
 
-    # choose a texture set for each zone
+    # choose a texture set for each mat
     sets = minewad.read_texsets('texsets.txt')
-    zonetexs = { zone : random.choice(sets) for zone in zones }
+    mattexs = { mat : random.choice(sets) for mat in materials }
 
     for (sid, sec) in id_iter(mapp.sectors):
-        zone = sec2zone[sid]
-        ts = zonetexs[zone]
+        mat = sec2material[sid]
+        ts = mattexs[mat]
         sec.floor_pic = ts.floor
         sec.ceil_pic = ts.ceil
 
     for sd in mapp.sidedefs:
         sid = sd.sector
         sec = mapp.sectors[sid]
-        zone = sec2zone[sid]
-        ts = zonetexs[zone]
+        mat = sec2material[sid]
+        ts = mattexs[mat]
         sd.midtex = get_wrap(ts.sidetexs, 0)
         sd.uppertex = get_wrap(ts.sidetexs, 1)
         sd.lowertex = get_wrap(ts.sidetexs, 2)
@@ -843,45 +848,32 @@ def assign_textures(mapp, builder):
 
 class Voxel(object):
     def __init__(s):
-        s.zone = None
+        s.material = None
         s.door_pair = None  # only used to distinguish between different doors
         s.floorht = int(0)
         s.ceilht = int(100)
     
-    def as_tuple(s):
-        return (s.zone, s.door_pair, s.floorht, s.ceilht)
+    def sector_data(s):
+        return (s.material, s.door_pair, s.floorht, s.ceilht)
+
+    def same_sector(s, other):
+        return s.sector_data() == other.sector_data()
+
+    def __eq__(s,t):
+        return s.sector_data() == t.sector_data()
+
+    def __ne__(s,t):
+        return s.sector_data() != t.sector_data()
 
     def __str__(s):
-        return str(s.as_tuple())
-
-    def __eq__(s, t):
-        return s.as_tuple() == t.as_tuple()
-
-    def __ne__(s, t):
-        return not s.__eq__(t)
+        return str(s.sector_data())
 
     def __hash__(s):
-        return hash(s.as_tuple())
+        return hash(s.sector_data())
 
     @staticmethod
     def test():
-        Voxel.test_eq_ne()
-
-    @staticmethod
-    def test_eq_ne():
-        d1 = Voxel()
-        d2 = Voxel()
-        d3 = Voxel()
-
-        d1.zone = 'a'
-        d2.zone = 'a'
-        d3.zone = ' '
-
-        assert d1 == d1
-        assert d1 == d2
-        assert d2 == d1
-        assert d3 != d1
-        assert d3 != d2
+        pass
 
 def make_pillars(voxel_grid):
     total = voxel_grid.W * voxel_grid.H / 40
@@ -889,8 +881,8 @@ def make_pillars(voxel_grid):
     for (u,p) in voxel_grid.piter_rand():
         p = voxel_grid.pget(u)
         if count >= total: break
-        if p.zone != ' ' and p.door_pair == None:
-            p.zone = ' '
+        if p.material and p.door_pair == None:
+            p.material = None
             count += 1
 
 def clear_paths(V, Z, doors):
@@ -914,7 +906,7 @@ def clear_paths(V, Z, doors):
                     yield v
 
         def edge_cost(u,v):
-            if V.pget(u).zone != zone:
+            if Z.pget(u) != zone:
                 return 999
             else:
                 return 1
@@ -928,7 +920,8 @@ def clear_paths(V, Z, doors):
                 for u in astar.astar(doorcell, hub, yield_nbors, edge_cost, est_to_target):
                     # override whatever is here and force it to be this zone
                     # this is the "digging"
-                    V.pget(u).zone = zone
+                    # TODO should use a zone2material map
+                    V.pget(u).material = zone
 
 if __name__ == '__main__':
 
@@ -951,9 +944,12 @@ if __name__ == '__main__':
         """
 
     voxel_grid = Grid2(zone_grid.W, zone_grid.H, None)
-    for (u, p) in zone_grid.piter():
+    for (u, zone) in zone_grid.piter():
         data = Voxel()
-        data.zone = p
+        if zone == ' ':
+            data.material = None # TEMP
+        else:
+            data.material = zone
         voxel_grid.pset(u, data)
 
 # perlin noise heights
@@ -966,7 +962,7 @@ if __name__ == '__main__':
         data.ceilht = ht + 256
 
     doorer = DoorBuilder()
-    doorer.apply_doors_to_voxels(voxel_grid, doors, locks, keys)
+    doorer.apply_doors_to_voxels(voxel_grid, zone_grid, doors, locks, keys)
 
     # random pillars
     make_pillars(voxel_grid)
@@ -975,7 +971,7 @@ if __name__ == '__main__':
         # make all solid
         for (u, p) in voxel_grid.piter():
             if p.door_pair == None:
-                p.zone = ' '
+                p.material = None
 
     clear_paths(voxel_grid, zone_grid, doors)
 
@@ -990,12 +986,14 @@ if __name__ == '__main__':
     builder = MapGeoBuilder(mapp)
     # scale = 4096/
     scale = 48
-    builder.synth_grid(voxel_grid, scale, lambda data : data.zone == ' ')
+    builder.synth_grid(voxel_grid, scale,
+            lambda data : data.material == None,
+            lambda u,v : u.same_sector(v))
     # builder.relax_verts()
 
     secid2zone = {}
     for (vox, secid) in builder.val2sectorid.iteritems():
-        secid2zone[ secid ] = vox.zone
+        secid2zone[ secid ] = vox.material
 
     assign_textures(mapp, builder)
 
