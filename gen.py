@@ -1024,7 +1024,7 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
                     for (v,q) in Z.nbors8(u):
                         if q == zone:
                             V.pget(v).material = zone
-                            V.pget(u).floorht = 16
+                            V.pget(v).floorht = 16
 
 if __name__ == '__main__':
 
