@@ -454,7 +454,7 @@ def method2(L, numRegions):
 
     save_grid_png(G, 'grid-pre-remove-spaces.png')
 
-    space_vals = remove_smallest_regions(G, ' ', space_vals, 0.5)
+    # space_vals = remove_smallest_regions(G, ' ', space_vals, 0.5)
 
     save_grid_png(G, 'grid-post-remove-spaces.png')
 
@@ -885,31 +885,63 @@ def make_pillars(voxel_grid):
             p.material = None
             count += 1
 
-def clear_paths(V, Z, doors):
-    zones = set()
+def compute_zone2cells(Z, empty_zone):
     zone2cells = {}
     for (u,zone) in Z.piter():
-        if zone == ' ':
+        if zone == empty_zone:
             continue
         if zone not in zone2cells:
             zone2cells[zone] = []
         zone2cells[zone].append(u)
+    return zone2cells
+
+def fill_dummy0( zone_grid, voxel_grid, hardness_grid, zone, cells ):
+    Z = zone_grid
+    V = voxel_grid
+    H = hardness_grid
+    # compute centroid
+    cent = Int2.centroid(cells)
+
+    avgdist = 0
+    for u in cells:
+        avgdist += Int2.euclidian_dist(u, cent)
+    avgdist /= len(cells)
+
+    for u in cells:
+        dist = Int2.euclidian_dist(u, cent)
+        if dist < avgdist:
+            V.pget(u).material = zone
+            H.pset(u, 0)
+        else:
+            V.pget(u).material = None
+            H.pset(u, 999)
+
+    for u in Int2.incrange(cent.with_y(0), cent.with_y(Z.H-1)):
+        H.pset(u, 1)
+
+def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
+
+    V = voxel_grid
+    Z = zone_grid
+    H = hardness_grid
 
     for (zone, cells) in zone2cells.iteritems():
         assert len(cells) > 0
-        hub = random.choice(cells)
+        spaces = [cell for cell in cells if voxel_grid.pget(cell).material != None]
+        if len(spaces) == 0:
+            hub = random.choice(cells)
+        else:
+            hub = random.choice(spaces)
+        assert Z.pget(hub) == zone
 
         def yield_nbors(u):
-            print u
             for (v,q) in Z.nbors4(u):
                 if q == zone:
                     yield v
 
         def edge_cost(u,v):
-            if Z.pget(u) != zone:
-                return 999
-            else:
-                return 1
+            assert Z.pget(v) == zone
+            return H.pget(v) + 1
 
         def est_to_target(u):
             return Int2.euclidian_dist(u, hub)
@@ -932,6 +964,12 @@ if __name__ == '__main__':
     L = int(sys.argv[1])
     (zone_grid, locks, keys, doors, spawn_zone, exit_zone) = method2(L, int(sys.argv[2]))
 
+    for _ in plot_to_png('zone_grid_with_doors.png'):
+        temp = zone_grid.duplicate()
+        for ( zones, cell ) in doors.iteritems():
+            temp.pset(cell, '99')
+        temp.show_image()
+
     """
     print 'draw zone grid'
     pylab.figure()
@@ -953,7 +991,7 @@ if __name__ == '__main__':
         voxel_grid.pset(u, data)
 
 # perlin noise heights
-        if True:
+        if False:
             noiseval = noise.pnoise2( u.x*5.0/L, u.y*5.0/L )
             ht = int((noiseval*0.5 + 0.5) * 5) * 16
         else:
@@ -964,8 +1002,15 @@ if __name__ == '__main__':
     doorer = DoorBuilder()
     doorer.apply_doors_to_voxels(voxel_grid, zone_grid, doors, locks, keys)
 
-    # random pillars
-    make_pillars(voxel_grid)
+    # run fillers per zone
+    zone2cells = compute_zone2cells(zone_grid, ' ')
+    hardness_grid = Grid2.new_same_size(zone_grid, 0)
+    if True:
+        for (zone, cells) in zone2cells.iteritems():
+            fill_dummy0( zone_grid, voxel_grid, hardness_grid, zone, cells )
+
+    if False:
+        make_pillars(voxel_grid)
 
     if False:
         # make all solid
@@ -973,7 +1018,7 @@ if __name__ == '__main__':
             if p.door_pair == None:
                 p.material = None
 
-    clear_paths(voxel_grid, zone_grid, doors)
+    clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors)
 
     spawnAreaCells = [c for c in zone_grid.cells_with_value(spawn_zone)]
     startcell = random.choice(spawnAreaCells)

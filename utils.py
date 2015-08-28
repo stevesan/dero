@@ -81,6 +81,12 @@ class Int2:
     def __mul__(u, s):
         return Int2(u.x*s, u.y*s)
 
+    def with_y(u, y):
+        return Int2(u.x, y)
+
+    def with_x(u, x):
+        return Int2(x, u.y)
+
     def yieldtest(self):
         yield 1
         yield 2
@@ -137,6 +143,20 @@ class Int2:
         dx = v.x - u.x
         dy = v.y - u.y
         return math.sqrt(dx*dx + dy*dy)
+
+    @staticmethod
+    def centroid(coords):
+        summ = Int2(0,0)
+        for c in coords:
+            summ = summ + c
+        return summ / len(coords)
+
+    @staticmethod
+    def incrange(a, b):
+        """ inclusive range """
+        for x in range(a.x, b.x+1):
+            for y in range(a.y, b.y+1):
+                yield Int2(x,y)
 
 class Grid2:
     def __init__(self,_W, _H, default):
@@ -399,6 +419,11 @@ class Grid2:
         for (v,q) in G.nbors4(u):
             touch_vals.add(q)
         return touch_vals
+
+    @staticmethod
+    def new_same_size(other, default_val):
+        g = Grid2(other.W, other.H, default_val)
+        return g
 
 EDGE_TO_NORM = [
     Int2(1, 0),

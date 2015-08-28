@@ -102,8 +102,10 @@ seeing key before door happens A LOT
     mine minimaps to show keys and doors!
 
 color doors in wad dumps
-----------------------------------------
 
-paradigm:
+the fill-path paradigm:
     shape algos can do whatever they want, but later on, the "tunneling algo" will use weighted-A-star to ensure paths.
     AND, shape algos can define weights! ex. if you build a room with four walls and four POSSIBLE entrances, you should make the entrance voxels (1 per wall) have small weight compared to the rest of the wall voxels, so the pathing algo will be very likely to break one of those voxels.
+----------------------------------------
+
+create some interesting fill algos!
