@@ -895,17 +895,82 @@ def compute_zone2cells(Z, empty_zone):
         zone2cells[zone].append(u)
     return zone2cells
 
-def fill_dummy0( zone_grid, voxel_grid, hardness_grid, zone, cells ):
+def fill_pillars( zone_grid, voxel_grid, hardness_grid, zone, cells ):
+    Z = zone_grid
+    V = voxel_grid
+    H = hardness_grid
+    density = random.random()
+    for u in cells:
+        if random.random() < density:
+            V.pget(u).material = None
+            H.pset(u, 999)
+
+def fill_spread_symmetric( zone_grid, voxel_grid, hardness_grid, zone, cells ):
+    Z = zone_grid
+    V = voxel_grid
+    H = hardness_grid
+    cent = Int2.centroid(cells)
+    max_spreads = int(len(cells)/2 * random.random())
+
+    def make_solid(u):
+        V.pget(u).material = None
+        H.pset(u, 999)
+
+    # prepare grid for spreading
+    OFF_LIMITS = 0
+    USED = 1
+    FREE = 2
+    spread_grid = Grid2.new_same_size(zone_grid, OFF_LIMITS)
+    S = spread_grid
+
+    # first make whole zone solid, but FREE for spreading
+    for u in cells:
+        S.pset(u, FREE)
+        make_solid(u)
+
+    # start spreading
+    front = FrontManager(S, FREE)
+
+    def make_space(u):
+        V.pget(u).material = zone
+        H.pset(u, 0)
+        S.pset(u, USED)
+        front.on_fill(u)
+
+    front.recompute(set([USED]))
+    make_space(cent)
+    front.check()
+
+    # now carve out symmetric space
+
+    def reflect(u):
+        # just across Y axis for now
+        return Int2(cent.x + (cent.x - u.x), u.y)
+
+    done = 0
+    while done < max_spreads and front.size() > 0:
+        a = front.sample()
+        b = reflect(a)
+        # make sure we can spread symmetrically
+        if S.pget(a) == FREE and S.pget(b) == FREE:
+            assert Z.pget(a) == zone
+            assert Z.pget(b) == zone
+            for u in set([a,b]):
+                make_space(u)
+            done += 1
+        else:
+            # can't spread here this way. mark it as such.
+            for u in set([a,b]):
+                S.pset(u, OFF_LIMITS)
+                front.on_fill(u)
+
+def fill_circular( zone_grid, voxel_grid, hardness_grid, zone, cells ):
     Z = zone_grid
     V = voxel_grid
     H = hardness_grid
     # compute centroid
     cent = Int2.centroid(cells)
-
-    avgdist = 0
-    for u in cells:
-        avgdist += Int2.euclidian_dist(u, cent)
-    avgdist /= len(cells)
+    avgdist = cent.avg_dist(cells)
 
     for u in cells:
         dist = Int2.euclidian_dist(u, cent)
@@ -954,6 +1019,12 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
                     # this is the "digging"
                     # TODO should use a zone2material map
                     V.pget(u).material = zone
+                    V.pget(u).floorht = 16
+                    # expand by 1 ring
+                    for (v,q) in Z.nbors8(u):
+                        if q == zone:
+                            V.pget(v).material = zone
+                            V.pget(u).floorht = 16
 
 if __name__ == '__main__':
 
@@ -1005,9 +1076,13 @@ if __name__ == '__main__':
     # run fillers per zone
     zone2cells = compute_zone2cells(zone_grid, ' ')
     hardness_grid = Grid2.new_same_size(zone_grid, 0)
+    #fillers = [fill_circular, fill_pillars, fill_spread_symmetric]
+    fillers = [fill_spread_symmetric]
     if True:
         for (zone, cells) in zone2cells.iteritems():
-            fill_dummy0( zone_grid, voxel_grid, hardness_grid, zone, cells )
+            print 'filling out zone %s' % zone
+            filler = random.choice(fillers)
+            filler( zone_grid, voxel_grid, hardness_grid, zone, cells )
 
     if False:
         make_pillars(voxel_grid)
@@ -1030,11 +1105,11 @@ if __name__ == '__main__':
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
     # scale = 4096/
-    scale = 48
+    scale = 64
     builder.synth_grid(voxel_grid, scale,
             lambda data : data.material == None,
             lambda u,v : u.same_sector(v))
-    # builder.relax_verts()
+    #builder.relax_verts()
 
     secid2zone = {}
     for (vox, secid) in builder.val2sectorid.iteritems():

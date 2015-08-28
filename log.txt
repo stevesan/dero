@@ -109,3 +109,4 @@ the fill-path paradigm:
 ----------------------------------------
 
 create some interesting fill algos!
+    symmetic spread

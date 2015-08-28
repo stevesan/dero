@@ -128,6 +128,13 @@ class Int2:
         """ CCW 90-degree multiple turn """
         return INT2_CCW_QUARTER_ROT_MATRICES[turns].transform(self)
 
+    def avg_dist(u, vs):
+        d = 0.0
+        for v in vs:
+            d += Int2.euclidian_dist(u, v)
+        d /= len(vs)
+        return d
+
     @staticmethod
     def floor(v2):
         return Int2(
@@ -500,17 +507,16 @@ def pick_random_from_set(s):
     return pick_random([x for x in s])
 
 class FrontManager:
-    def __init__(self, grid, freevalue, invalues):
+    def __init__(self, grid, freevalue):
         self.grid = grid
         self.freevalue = freevalue
-        self.invalues = invalues
         self.frontcells = None
 
-    def recompute(self):
+    def recompute(self, invalues):
         self.frontcells = set()
         for u in self.grid.cells_with_value(self.freevalue):
             for (v,y) in self.grid.nbors4(u):
-                if y in self.invalues:
+                if y in invalues:
                     self.frontcells.add(u)
                     break
 
@@ -540,8 +546,8 @@ class FrontManager:
 
 def seed_spread(seedvals, sews, G, freevalue, max_spreads):
     seedvalset = set(seedvals)
-    front = FrontManager(G, freevalue, seedvalset)
-    front.recompute()
+    front = FrontManager(G, freevalue)
+    front.recompute(seedvalset)
     front.check()
 
     def only_touches_values(u, values):
