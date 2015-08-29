@@ -522,12 +522,16 @@ class FrontManager:
 
     def on_fill(self, u):
         assert self.grid.pget(u) != self.freevalue
-
         if u in self.frontcells:
             self.frontcells.remove(u)
         for (v,val) in self.grid.nbors4(u):
             if val == self.freevalue and v not in self.frontcells:
                 self.frontcells.add(v)
+
+    def on_off_limits(self, u):
+        """ Like on_fill, but will not expand the front """
+        if u in self.frontcells:
+            self.frontcells.remove(u)
 
     def sample(self):
         return random.sample(self.frontcells, 1)[0]
@@ -596,7 +600,7 @@ def seed_spread(seedvals, sews, G, freevalue, max_spreads):
         if len(touched_regions) > 1:
             # 'fill' this with a free value, and mark it as filled so no one uses this
             G.pset(u, sepvalue)
-            front.on_fill(u)
+            front.on_off_limits(u)
             continue
 
         if len(touched_regions) == 0:

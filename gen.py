@@ -910,7 +910,7 @@ def fill_spread_symmetric( zone_grid, voxel_grid, hardness_grid, zone, cells ):
     V = voxel_grid
     H = hardness_grid
     cent = Int2.centroid(cells)
-    max_spreads = int(len(cells)/2 * random.random())
+    max_spreads = int(len(cells)/2)
 
     def make_solid(u):
         V.pget(u).material = None
@@ -962,7 +962,7 @@ def fill_spread_symmetric( zone_grid, voxel_grid, hardness_grid, zone, cells ):
             # can't spread here this way. mark it as such.
             for u in set([a,b]):
                 S.pset(u, OFF_LIMITS)
-                front.on_fill(u)
+                front.on_off_limits(u)
 
 def fill_circular( zone_grid, voxel_grid, hardness_grid, zone, cells ):
     Z = zone_grid
@@ -1021,10 +1021,10 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
                     V.pget(u).material = zone
                     V.pget(u).floorht = 16
                     # expand by 1 ring
-                    for (v,q) in Z.nbors8(u):
-                        if q == zone:
-                            V.pget(v).material = zone
-                            V.pget(v).floorht = 16
+                    # for (v,q) in Z.nbors8(u):
+                        # if q == zone:
+                            # V.pget(v).material = zone
+                            # V.pget(v).floorht = 16
 
 if __name__ == '__main__':
 
