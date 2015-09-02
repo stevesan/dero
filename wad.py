@@ -375,12 +375,23 @@ class Map:
             if color:
                 pylab.plot([t.x], [t.y], '.', color=color)
 
+        color2lds = {}
         for ld in s.linedefs:
-            if random.random() > linechance:
-                continue
-            p0 = s.verts[ld.vert0]
-            p1 = s.verts[ld.vert1]
-            pylab.plot( [p0.x, p1.x], [p0.y, p1.y], '-', color=get_color_for_linedef(ld) )
+            color = get_color_for_linedef(ld)
+            if not color in color2lds:
+                color2lds[color] = []
+            color2lds[color].append(ld)
+
+        for (color, lds) in color2lds.iteritems():
+            xx = []
+            yy = []
+            nan = float('nan')
+            for ld in lds:
+                p0 = s.verts[ld.vert0]
+                p1 = s.verts[ld.vert1]
+                xx += [p0.x, p1.x, nan]
+                yy += [p0.y, p1.y, nan]
+            pylab.plot( xx, yy, '-', color=color )
 
         # make it square
         xx = [v.x for v in s.verts]

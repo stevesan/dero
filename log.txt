@@ -1,4 +1,5 @@
 
+should make everything soft except the walls aroudn the area, and then in those walls, poke soft holes
 DOORS:
     how to make a door?
     doom spec line 1078

@@ -427,6 +427,9 @@ class Grid2:
             touch_vals.add(q)
         return touch_vals
 
+    def size(s):
+        return Int2(s.W, s.H)
+
     @staticmethod
     def new_same_size(other, default_val):
         g = Grid2(other.W, other.H, default_val)
@@ -889,3 +892,17 @@ def plot_to_png(pngf):
     pylab.grid(True)
     pylab.savefig(pngf)
     pylab.close()
+
+def argmin(xx):
+    b = None
+    for i in range(len(xx)):
+        if not b or xx[i] < xx[b]:
+            b = i
+    return b
+
+def argmax(xx):
+    b = None
+    for i in range(len(xx)):
+        if not b or xx[i] > xx[b]:
+            b = i
+    return b

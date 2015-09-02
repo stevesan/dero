@@ -452,11 +452,10 @@ def method2(L, numRegions):
     seed_spread(space_vals, 1, G, ' ', L*L)
     G.replace('b', ' ')
 
-    save_grid_png(G, 'grid-pre-remove-spaces.png')
-
+    # save_grid_png(G, 'grid-pre-remove-spaces.png')
     # space_vals = remove_smallest_regions(G, ' ', space_vals, 0.5)
 
-    save_grid_png(G, 'grid-post-remove-spaces.png')
+    save_grid_png(G, 'space-grid.png')
 
     print 'finding tunnels'
     doors = find_doors(G, space_vals)
@@ -905,84 +904,127 @@ def fill_pillars( zone_grid, voxel_grid, hardness_grid, zone, cells ):
             V.pget(u).material = None
             H.pset(u, 999)
 
-def fill_spread_symmetric( zone_grid, voxel_grid, hardness_grid, zone, cells ):
-    Z = zone_grid
-    V = voxel_grid
-    H = hardness_grid
-    cent = Int2.centroid(cells)
-    max_spreads = int(len(cells)/2)
+class ZoneFiller(object):
 
-    def make_solid(u):
-        V.pget(u).material = None
-        H.pset(u, 999)
+    def __init__( s, zone_grid, voxel_grid ):
+        s.Z = zone_grid
+        s.V = voxel_grid
 
-    # prepare grid for spreading
-    OFF_LIMITS = 0
-    USED = 1
-    FREE = 2
-    spread_grid = Grid2.new_same_size(zone_grid, OFF_LIMITS)
-    S = spread_grid
+        s.zone2cells = compute_zone2cells(zone_grid, ' ')
+        s.H = Grid2.new_same_size(zone_grid, 0)
 
-    # first make whole zone solid, but FREE for spreading
-    for u in cells:
-        S.pset(u, FREE)
-        make_solid(u)
+    def make_solid(s, u):
+        """ util for fillers """
+        s.V.pget(u).material = None
+        s.H.pset(u, 999)
 
-    # start spreading
-    front = FrontManager(S, FREE)
+    def carve(s, u, zone):
+        s.V.pget(u).material = zone
+        s.H.pset(u, 0)
 
-    def make_space(u):
-        V.pget(u).material = zone
-        H.pset(u, 0)
-        S.pset(u, USED)
-        front.on_fill(u)
+    def fill_all_zones(s):
+        # fillers = [ZoneFiller.fill_circular, ZoneFiller.fill_pillars, ZoneFiller.fill_spread_symmetric]
+        fillers = [ZoneFiller.fill_spread_symmetric]
+        for (zone, cells) in s.zone2cells.iteritems():
+            print 'filling out zone %s' % zone
+            filler = random.choice(fillers)
+            filler( s, zone, cells )
 
-    front.recompute(set([USED]))
-    make_space(cent)
-    front.check()
+    def fill_spread_symmetric( s, zone, cells ):
+        max_spreads = int(len(cells)/4)
+        cent = Int2.centroid(cells)
+        for u in cells:
+            s.make_solid(u)
+        carved = []
+        for u in s.yield_symmetric_spread(cells, cent, max_spreads):
+            assert s.Z.pget(u) == zone
+            s.carve(u, zone)
+            carved.append(u)
 
-    # now carve out symmetric space
+        # raise a slight symmetric pattern within what we carved out
+        for u in s.yield_symmetric_spread(carved, cent, max_spreads/2):
+            assert s.Z.pget(u) == zone
+            s.V.pget(u).floorht = 16
 
-    def reflect(u):
-        # just across Y axis for now
-        return Int2(cent.x + (cent.x - u.x), u.y)
+        # make the material along the vertical axis of symmetry very soft
+        def soften_ray(start, du):
+            u = start
+            while s.Z.check(u) and s.Z.pget(u) == zone:
+                if s.V.pget(u).material == None:
+                    s.H.pset(u, 1)
+                u += du
 
-    done = 0
-    while done < max_spreads and front.size() > 0:
-        a = front.sample()
-        b = reflect(a)
-        # make sure we can spread symmetrically
-        if S.pget(a) == FREE and S.pget(b) == FREE:
-            assert Z.pget(a) == zone
-            assert Z.pget(b) == zone
-            for u in set([a,b]):
-                make_space(u)
-            done += 1
-        else:
-            # can't spread here this way. mark it as such.
-            for u in set([a,b]):
-                S.pset(u, OFF_LIMITS)
-                front.on_off_limits(u)
+        soften_ray(cent, Int2(0,1))
+        soften_ray(cent, Int2(0,-1))
+        soften_ray(cent, Int2(1,0))
+        soften_ray(cent, Int2(-1,0))
 
-def fill_circular( zone_grid, voxel_grid, hardness_grid, zone, cells ):
-    Z = zone_grid
-    V = voxel_grid
-    H = hardness_grid
-    # compute centroid
-    cent = Int2.centroid(cells)
-    avgdist = cent.avg_dist(cells)
+    def yield_symmetric_spread( s, cells, start, max_spreads ):
+        """ yields cells spreading symmetrically within given cells """
 
-    for u in cells:
-        dist = Int2.euclidian_dist(u, cent)
-        if dist < avgdist:
-            V.pget(u).material = zone
-            H.pset(u, 0)
-        else:
-            V.pget(u).material = None
-            H.pset(u, 999)
+        def reflect(u):
+            # just across Y axis for now
+            return Int2(start.x + (start.x - u.x), u.y)
 
-    for u in Int2.incrange(cent.with_y(0), cent.with_y(Z.H-1)):
-        H.pset(u, 1)
+        Z = s.Z
+
+        # prepare grid for spreading
+        OFF_LIMITS = 0
+        USED = 1
+        FREE = 2
+        spread_grid = Grid2.new_same_size(zone_grid, OFF_LIMITS)
+        S = spread_grid
+
+        # first make whole zone solid, but FREE for spreading
+        for u in cells:
+            S.pset(u, FREE)
+
+        # start spreading
+        front = FrontManager(S, FREE)
+        front.recompute(set([USED]))
+
+        def on_spread(u):
+            S.pset(u, USED)
+            front.on_fill(u)
+
+        on_spread(start)
+        yield start
+        front.check()
+
+        done = 0
+        while done < max_spreads and front.size() > 0:
+            a = front.sample()
+            b = reflect(a)
+            # make sure we can spread symmetrically
+            if S.pget(a) == FREE and S.pget(b) == FREE:
+                on_spread(a)
+                on_spread(b)
+                yield a
+                yield b
+                done += 1
+            else:
+                # can't spread here this way. mark it as such.
+                for u in set([a,b]):
+                    S.pset(u, OFF_LIMITS)
+                    front.on_off_limits(u)
+
+    def fill_circular( s, zone, cells ):
+        Z = s.Z
+        V = s.V
+        H = s.H
+        # compute centroid
+        cent = Int2.centroid(cells)
+        avgdist = cent.avg_dist(cells)
+
+        for u in cells:
+            dist = Int2.euclidian_dist(u, cent)
+            if dist < avgdist:
+                s.carve(u, zone)
+            else:
+                s.make_solid(u)
+
+        for u in Int2.incrange(cent.with_y(0), cent.with_y(Z.H-1)):
+            H.pset(u, 1)
 
 def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
 
@@ -990,13 +1032,18 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
     Z = zone_grid
     H = hardness_grid
 
+    save_grid_png(H, 'hardness.png')
+
     for (zone, cells) in zone2cells.iteritems():
         assert len(cells) > 0
-        spaces = [cell for cell in cells if voxel_grid.pget(cell).material != None]
-        if len(spaces) == 0:
-            hub = random.choice(cells)
-        else:
-            hub = random.choice(spaces)
+        hub = Int2.centroid(cells)
+
+        if Z.pget(hub) != zone or H.pget(hub) != 0:
+            spaces = [cell for cell in cells if voxel_grid.pget(cell).material != None]
+            if len(spaces) == 0:
+                hub = random.choice(cells)
+            else:
+                hub = random.choice(spaces)
         assert Z.pget(hub) == zone
 
         def yield_nbors(u):
@@ -1005,6 +1052,7 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
                     yield v
 
         def edge_cost(u,v):
+            # always add one for distance
             assert Z.pget(v) == zone
             return H.pget(v) + 1
 
@@ -1017,14 +1065,17 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
                 for u in astar.astar(doorcell, hub, yield_nbors, edge_cost, est_to_target):
                     # override whatever is here and force it to be this zone
                     # this is the "digging"
-                    # TODO should use a zone2material map
+                    assert u == doorcell or Z.pget(u) == zone
                     V.pget(u).material = zone
-                    V.pget(u).floorht = 16
+                    if False:
+                        V.pget(u).material = zone + 'path'
+                        V.pget(u).floorht = 4
                     # expand by 1 ring
-                    # for (v,q) in Z.nbors8(u):
-                        # if q == zone:
-                            # V.pget(v).material = zone
-                            # V.pget(v).floorht = 16
+                    if False:
+                        for (v,q) in Z.nbors8(u):
+                            if q == zone:
+                                V.pget(v).material = zone
+                                V.pget(v).floorht = 16
 
 if __name__ == '__main__':
 
@@ -1068,39 +1119,19 @@ if __name__ == '__main__':
         else:
             ht = 0
         data.floorht = ht
-        data.ceilht = ht + 256
+        data.ceilht = ht + 192
 
     doorer = DoorBuilder()
     doorer.apply_doors_to_voxels(voxel_grid, zone_grid, doors, locks, keys)
 
     # run fillers per zone
-    zone2cells = compute_zone2cells(zone_grid, ' ')
-    hardness_grid = Grid2.new_same_size(zone_grid, 0)
-    #fillers = [fill_circular, fill_pillars, fill_spread_symmetric]
-    fillers = [fill_spread_symmetric]
-    if True:
-        for (zone, cells) in zone2cells.iteritems():
-            print 'filling out zone %s' % zone
-            filler = random.choice(fillers)
-            filler( zone_grid, voxel_grid, hardness_grid, zone, cells )
+    filler = ZoneFiller( zone_grid, voxel_grid )
+    filler.fill_all_zones()
 
-    if False:
-        make_pillars(voxel_grid)
+    clear_paths(voxel_grid, zone_grid, filler.H, filler.zone2cells, doors)
 
-    if False:
-        # make all solid
-        for (u, p) in voxel_grid.piter():
-            if p.door_pair == None:
-                p.material = None
-
-    clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors)
-
-    spawnAreaCells = [c for c in zone_grid.cells_with_value(spawn_zone)]
-    startcell = random.choice(spawnAreaCells)
-    # raise start pos a bit
-    startdata = voxel_grid.pget(startcell)
-    startdata.floorht = 40
-
+    spawn_cells = [c for c in zone_grid.cells_with_value(spawn_zone)]
+    spawn_cell = random.choice(spawn_cells)
 
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
@@ -1125,7 +1156,7 @@ if __name__ == '__main__':
         sector.ceil_height = data.ceilht
 
     # add player start
-    mapp.add_player_start( int((startcell.x+0.5)*scale), int((startcell.y+0.5)*scale), 0 )
+    mapp.add_player_start( int((spawn_cell.x+0.5)*scale), int((spawn_cell.y+0.5)*scale), 0 )
 
     # add exit linedef
     for ld in mapp.linedefs:
