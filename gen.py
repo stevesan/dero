@@ -17,7 +17,7 @@ import astar
 EMPTY_ZONE = ' '
 
 def testBasic():
-    g = Grid2(80,80,' ')
+    g = Grid2(80,80,EMPTY_ZONE)
 
     for (x,y) in g.iter():
         if random.random() < 0.2:
@@ -64,7 +64,7 @@ def tunnel(g, p, c, numdigs, maxdigs):
             tunnel(g, nbor, c, numdigs, maxdigs)
 
 def tunnel_test():
-    g = Grid2(40,40,' ')
+    g = Grid2(40,40,EMPTY_ZONE)
     tunnel(g, Int2(0, 0), 'X', 0, 20)
     g.write()
 
@@ -283,16 +283,7 @@ class DoorBuilder:
     def is_door_locked(s, door):
         return door[1] in s.locks
 
-    def apply_doors_to_voxels(s, voxel_grid, zone_grid, doors, locks, keys):
-
-        for (pair, u) in doors.iteritems():
-            doorvox = voxel_grid.pget(u)
-            # use entering zone as material
-            doorvox.material = pair[0]
-            doorvox.door_pair = pair
-            doorvox.ceilht = doorvox.floorht
-
-        # some simple lock stuff
+    def setup(s, voxel_grid, zone_grid, locks, keys):
 
         if len(locks) > 3:
             locks = locks[0:3]
@@ -303,7 +294,6 @@ class DoorBuilder:
         s.keys = keys
         s.voxel_grid = voxel_grid
         s.zone_grid = zone_grid
-        s.doors = doors
 
     def read_door_texture_list(s):
         doortexs = []
@@ -314,20 +304,20 @@ class DoorBuilder:
         assert len(doortexs) > 10
         return doortexs
 
-    def apply_doors_to_map(s, mapp, builder, scale):
+    def apply_doors_to_map(s, mapp, builder, scale, pair2cell):
 
 # s.assert_one_sector_per_door(builder)
 
         # create 1-to-1 maps of door to sector id
         secid2door = {}
-        for (door, cell) in s.doors.iteritems():
+        for (door, cell) in pair2cell.iteritems():
             vox = s.voxel_grid.pget(cell)
             secid = builder.val2sectorid[vox]
             secid2door[secid] = door
 
         # assign texture set to each door sector
         doortexs = s.read_door_texture_list()
-        door2tex = { door:random.choice(doortexs) for door in s.doors }
+        door2tex = { door:random.choice(doortexs) for door in pair2cell }
 
         # choose a color for each lock
         colors = [c for c in wad.COLOR_TO_LINEDEF_FUNC]
@@ -896,16 +886,6 @@ def compute_zone2cells(Z, empty_zone):
         zone2cells[zone].append(u)
     return zone2cells
 
-def fill_pillars( zone_grid, voxel_grid, hardness_grid, zone, cells ):
-    Z = zone_grid
-    V = voxel_grid
-    H = hardness_grid
-    density = random.random()
-    for u in cells:
-        if random.random() < density:
-            V.pget(u).material = None
-            H.pset(u, 999)
-
 class ZoneFiller(object):
 
     def __init__( s, zone_grid, voxel_grid ):
@@ -914,11 +894,6 @@ class ZoneFiller(object):
 
         s.zone2cells = compute_zone2cells(zone_grid, EMPTY_ZONE)
         s.H = Grid2.new_same_size(zone_grid, 0)
-
-        # this doesn't really matter, since the path-clearer is aware of zone-separating walls, but just for debugging
-        for (u, p) in s.Z.piter():
-            if p == EMPTY_ZONE:
-                s.H.pset(u, 999999)
 
     def make_solid(s, u):
         """ util for fillers """
@@ -949,7 +924,7 @@ class ZoneFiller(object):
                     pass
                 else:
                     # non-wall diggable space
-                    s.H.pset(u, 1)
+                    s.H.pset(u, 0)
 
     def fill_spread_symmetric( s, zone, cells ):
         max_spreads = int(len(cells)/6)
@@ -962,17 +937,22 @@ class ZoneFiller(object):
             s.carve(u, zone)
             carved.append(u)
 
+            # harden potential walls
+            for (v,q) in s.Z.nbors8(u):
+                if q == EMPTY_ZONE:
+                    s.H.pset(v, 999)
+
         # raise a slight symmetric pattern within what we carved out
         for u in s.yield_symmetric_spread(carved, cent, max_spreads/2):
             assert s.Z.pget(u) == zone
-            s.V.pget(u).floorht = 16
+            s.V.pget(u).floorht = -8
 
         # make the material along the vertical axis of symmetry very soft
         def soften_ray(start, du):
             u = start
-            while s.Z.check(u) and s.Z.pget(u) == zone:
+            while s.Z.check(u) and s.Z.pget(u) in (EMPTY_ZONE, zone):
                 if s.V.pget(u).material == None:
-                    s.H.pset(u, 1)
+                    s.H.pset(u, 0)
                 u += du
 
         soften_ray(cent, Int2(0,1))
@@ -1055,48 +1035,66 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
 
     save_grid_png(H, 'hardness.png')
 
+    zone2hub = {}
     for (zone, cells) in zone2cells.iteritems():
-        assert len(cells) > 0
         hub = Int2.centroid(cells)
-
-        if Z.pget(hub) != zone or H.pget(hub) != 0:
-            spaces = [cell for cell in cells if voxel_grid.pget(cell).material != None]
+        if Z.pget(hub) != zone or V.pget(hub).material == None:
+            spaces = [cell for cell in cells if V.pget(cell).material != None]
             if len(spaces) == 0:
+                # guess we'll have to make one
                 hub = random.choice(cells)
             else:
                 hub = random.choice(spaces)
         assert Z.pget(hub) == zone
+        zone2hub[zone] = hub
+
+    pair2door = {}
+
+    for ((z1, z2), _) in doors.iteritems():
+
+        h1 = zone2hub[z1]
+        h2 = zone2hub[z2]
+
+        def separates_curr_pair_only(u):
+            for (v, q) in Z.nbors8(u):
+                if q not in (z1, z2, EMPTY_ZONE):
+                    return False
+            return True
 
         def yield_nbors(u):
             for (v,q) in Z.nbors4(u):
-                if q == zone:
+                if q in (z1, z2):
+                    yield v
+                elif q == EMPTY_ZONE and separates_curr_pair_only(v):
                     yield v
 
         def edge_cost(u,v):
             # always add one for distance
-            assert Z.pget(v) == zone
+            assert Z.pget(v) in (z1, z2, EMPTY_ZONE)
             return H.pget(v) + 1
 
         def est_to_target(u):
             return Int2.euclidian_dist(u, hub)
 
-        for (doorzones, doorcell) in doors.iteritems():
-            if zone in doorzones:
-                print 'zone ' + zone + ' astarring from ' + str(hub) + ' to ' + str(doorcell)
-                for u in astar.astar(doorcell, hub, yield_nbors, edge_cost, est_to_target):
-                    # override whatever is here and force it to be this zone
-                    # this is the "digging"
-                    assert u == doorcell or Z.pget(u) == zone
-                    V.pget(u).material = zone
-                    if False:
-                        V.pget(u).material = zone + 'path'
-                        V.pget(u).floorht = 4
-                    # expand by 1 ring
-                    if False:
-                        for (v,q) in Z.nbors8(u):
-                            if q == zone:
-                                V.pget(v).material = zone
-                                V.pget(v).floorht = 16
+        print 'astarring from %s to %s, hubs %s to %s' % (z1, z2, str(h1), str(h2))
+        for u in astar.astar(h1, h2, yield_nbors, edge_cost, est_to_target):
+            # override whatever is here and force it to be this zone
+            # this is the "digging"
+            if Z.pget(u) == EMPTY_ZONE:
+                vox = V.pget(u)
+                vox.material = z1
+                if (z1,z2) in pair2door:
+                    # already have a door cell. just set material
+                    pass
+                else:
+                    # setup and record the door cell
+                    vox.door_pair = (z1, z2)
+                    vox.ceilht = vox.floorht
+                    pair2door[ (z1,z2) ] = u
+            else:
+                V.pget(u).material = Z.pget(u)
+
+    return pair2door
 
 if __name__ == '__main__':
 
@@ -1107,27 +1105,12 @@ if __name__ == '__main__':
     L = int(sys.argv[1])
     (zone_grid, locks, keys, doors, spawn_zone, exit_zone) = method2(L, int(sys.argv[2]))
 
-    for _ in plot_to_png('zone_grid_with_doors.png'):
-        temp = zone_grid.duplicate()
-        for ( zones, cell ) in doors.iteritems():
-            temp.pset(cell, '99')
-        temp.show_image()
-
-    """
-    print 'draw zone grid'
-    pylab.figure()
-    zone_grid.show_image()
-    # write adjacency positions too, ie. the tunnels from one zone to the next
-    for ((a,b), (u,v)) in tunnels.iteritems():
-        pylab.annotate( '%s-%s' % (a,b), xy=(u.x, L-u.y-1))
-    pylab.savefig('grid-zones.png')
-    pylab.close()
-        """
+    save_grid_png(zone_grid, 'zone-grid.png')
 
     voxel_grid = Grid2(zone_grid.W, zone_grid.H, None)
     for (u, zone) in zone_grid.piter():
         data = Voxel()
-        if zone == ' ':
+        if zone == EMPTY_ZONE:
             data.material = None # TEMP
         else:
             data.material = zone
@@ -1143,13 +1126,13 @@ if __name__ == '__main__':
         data.ceilht = ht + 192
 
     doorer = DoorBuilder()
-    doorer.apply_doors_to_voxels(voxel_grid, zone_grid, doors, locks, keys)
+    doorer.setup(voxel_grid, zone_grid, locks, keys)
 
     # run fillers per zone
     filler = ZoneFiller( zone_grid, voxel_grid )
     filler.fill_all_zones()
 
-    clear_paths(voxel_grid, zone_grid, filler.H, filler.zone2cells, doors)
+    zonepair2doorcell = clear_paths(voxel_grid, zone_grid, filler.H, filler.zone2cells, doors)
 
     spawn_cells = [c for c in zone_grid.cells_with_value(spawn_zone)]
     spawn_cell = random.choice(spawn_cells)
@@ -1188,7 +1171,7 @@ if __name__ == '__main__':
             ld.function = 11
             rsd.midtex = 'SW1EXIT'
 
-    doorer.apply_doors_to_map(mapp, builder, scale)
+    doorer.apply_doors_to_map(mapp, builder, scale, zonepair2doorcell)
 
 # draw it
     print '%d linedefs' % len(mapp.linedefs)
