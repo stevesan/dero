@@ -1,5 +1,4 @@
 
-should make everything soft except the walls aroudn the area, and then in those walls, poke soft holes
 DOORS:
     how to make a door?
     doom spec line 1078
@@ -107,7 +106,12 @@ color doors in wad dumps
 the fill-path paradigm:
     shape algos can do whatever they want, but later on, the "tunneling algo" will use weighted-A-star to ensure paths.
     AND, shape algos can define weights! ex. if you build a room with four walls and four POSSIBLE entrances, you should make the entrance voxels (1 per wall) have small weight compared to the rest of the wall voxels, so the pathing algo will be very likely to break one of those voxels.
-----------------------------------------
-
 create some interesting fill algos!
     symmetic spread
+should make everything soft except the walls aroudn the area, and then in those walls, poke soft holes
+----------------------------------------
+
+connecting zones: do not be bound to the pre-defined doors!
+
+in the zone-step, it should just define which zones are adjacent, not how to get to them.
+clear_paths should be responsible for the exact paths.

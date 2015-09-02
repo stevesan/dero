@@ -14,6 +14,8 @@ import wad
 import minewad
 import astar
 
+EMPTY_ZONE = ' '
+
 def testBasic():
     g = Grid2(80,80,' ')
 
@@ -910,8 +912,13 @@ class ZoneFiller(object):
         s.Z = zone_grid
         s.V = voxel_grid
 
-        s.zone2cells = compute_zone2cells(zone_grid, ' ')
+        s.zone2cells = compute_zone2cells(zone_grid, EMPTY_ZONE)
         s.H = Grid2.new_same_size(zone_grid, 0)
+
+        # this doesn't really matter, since the path-clearer is aware of zone-separating walls, but just for debugging
+        for (u, p) in s.Z.piter():
+            if p == EMPTY_ZONE:
+                s.H.pset(u, 999999)
 
     def make_solid(s, u):
         """ util for fillers """
@@ -923,6 +930,9 @@ class ZoneFiller(object):
         s.H.pset(u, 0)
 
     def fill_all_zones(s):
+        Z = s.Z
+        V = s.V
+
         # fillers = [ZoneFiller.fill_circular, ZoneFiller.fill_pillars, ZoneFiller.fill_spread_symmetric]
         fillers = [ZoneFiller.fill_spread_symmetric]
         for (zone, cells) in s.zone2cells.iteritems():
@@ -930,8 +940,19 @@ class ZoneFiller(object):
             filler = random.choice(fillers)
             filler( s, zone, cells )
 
+            # un-harden cells that are not adjacent to space
+            for u in cells:
+                if V.pget(u).material != None:
+                    continue
+                if any([V.pget(v).material != None for (v,_) in V.nbors8(u)]):
+                    # adjacent to space - a wall.
+                    pass
+                else:
+                    # non-wall diggable space
+                    s.H.pset(u, 1)
+
     def fill_spread_symmetric( s, zone, cells ):
-        max_spreads = int(len(cells)/4)
+        max_spreads = int(len(cells)/6)
         cent = Int2.centroid(cells)
         for u in cells:
             s.make_solid(u)
