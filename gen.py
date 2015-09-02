@@ -898,7 +898,7 @@ class ZoneFiller(object):
     def make_solid(s, u):
         """ util for fillers """
         s.V.pget(u).material = None
-        s.H.pset(u, 999)
+        s.H.pset(u, 10)
 
     def carve(s, u, zone):
         s.V.pget(u).material = zone
@@ -929,6 +929,8 @@ class ZoneFiller(object):
     def fill_spread_symmetric( s, zone, cells ):
         max_spreads = int(len(cells)/6)
         cent = Int2.centroid(cells)
+        if cent not in cells:
+            cent = random.choice(cells)
         for u in cells:
             s.make_solid(u)
         carved = []
@@ -940,7 +942,7 @@ class ZoneFiller(object):
             # harden potential walls
             for (v,q) in s.Z.nbors8(u):
                 if q == EMPTY_ZONE:
-                    s.H.pset(v, 999)
+                    s.H.pset(v, 10)
 
         # raise a slight symmetric pattern within what we carved out
         for u in s.yield_symmetric_spread(carved, cent, max_spreads/2):
@@ -1134,8 +1136,14 @@ if __name__ == '__main__':
 
     zonepair2doorcell = clear_paths(voxel_grid, zone_grid, filler.H, filler.zone2cells, doors)
 
-    spawn_cells = [c for c in zone_grid.cells_with_value(spawn_zone)]
+    spawn_cells = [c for c in zone_grid.cells_with_value(spawn_zone) if voxel_grid.pget(c).material != None]
     spawn_cell = random.choice(spawn_cells)
+
+    for _ in plot_to_png('material-grid.png'):
+        M = Grid2.new_same_size(voxel_grid, None)
+        for (u,p) in voxel_grid.piter():
+            M.pset(u, p.material)
+        M.show_image()
 
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)

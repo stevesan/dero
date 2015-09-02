@@ -589,7 +589,7 @@ def seed_spread(seedvals, sews, G, freevalue, max_spreads):
     spreads = 0
     while front.size() > 0 and spreads < max_spreads:
         spreads += 1
-        if spreads % 10 == 0:
+        if spreads % 100 == 0:
             print '%d/%d' % (spreads, max_spreads)
         # spread
         u = front.sample()
