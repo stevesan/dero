@@ -1085,14 +1085,11 @@ def clear_paths(voxel_grid, zone_grid, hardness_grid, zone2cells, doors):
             if Z.pget(u) == EMPTY_ZONE:
                 vox = V.pget(u)
                 vox.material = z1
-                if (z1,z2) in pair2door:
-                    # already have a door cell. just set material
-                    pass
-                else:
-                    # setup and record the door cell
-                    vox.door_pair = (z1, z2)
-                    vox.ceilht = vox.floorht
-                    pair2door[ (z1,z2) ] = u
+                vox.door_pair = (z1, z2)
+                vox.ceilht = vox.floorht
+                # this does overwrite any previous cells, but that's ok
+                # door builder only needs 1 cell for this door to get the right sector
+                pair2door[ (z1,z2) ] = u
             else:
                 V.pget(u).material = Z.pget(u)
 

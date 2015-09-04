@@ -109,9 +109,15 @@ the fill-path paradigm:
 create some interesting fill algos!
     symmetic spread
 should make everything soft except the walls aroudn the area, and then in those walls, poke soft holes
-----------------------------------------
-
 connecting zones: do not be bound to the pre-defined doors!
-
 in the zone-step, it should just define which zones are adjacent, not how to get to them.
 clear_paths should be responsible for the exact paths.
+----------------------------------------
+
+tunnels too long
+area shapes too concave
+
+need shape generator with continuous parameters:
+    convexity
+    symmetry
+
