@@ -269,12 +269,6 @@ def remove_smallest_regions(G, fill_val, values, remove_ratio):
 
     return values
 
-def save_grid_png(G, path):
-    pylab.figure()
-    G.show_image()
-    pylab.savefig(path)
-    pylab.close()
-
 class DoorBuilder:
 
     def __init__(s):
@@ -548,7 +542,7 @@ def method2(L, numRegions):
     numzones = len(locks) + 1
 
     # draw the tree, labeling each node by its zone
-    for _ in plot_to_png('zoned-space-tree.png'):
+    with figure_to_png('zoned-space-tree.png'):
         nx.draw(space_tree, nodepos)
         pylab.xlim([0, L])
         pylab.ylim([0, L])
@@ -557,7 +551,7 @@ def method2(L, numRegions):
             pylab.annotate( str(zone), xy=add2(nodepos[node], (-2, 3)) )
 
     # draw the non-zoned tree
-    for _ in plot_to_png('space-tree.png'):
+    with figure_to_png('space-tree.png'):
         nx.draw(space_tree, nodepos)
         pylab.xlim([0, L])
         pylab.ylim([0, L])
@@ -1136,7 +1130,7 @@ if __name__ == '__main__':
     spawn_cells = [c for c in zone_grid.cells_with_value(spawn_zone) if voxel_grid.pget(c).material != None]
     spawn_cell = random.choice(spawn_cells)
 
-    for _ in plot_to_png('material-grid.png'):
+    with figure_to_png('material-grid.png'):
         M = Grid2.new_same_size(voxel_grid, None)
         for (u,p) in voxel_grid.piter():
             M.pset(u, p.material)
@@ -1145,7 +1139,7 @@ if __name__ == '__main__':
     mapp = wad.Map('E1M1')
     builder = MapGeoBuilder(mapp)
     # scale = 4096/
-    scale = 64
+    scale = 128
     builder.synth_grid(voxel_grid, scale,
             lambda data : data.material == None,
             lambda u,v : u.same_sector(v))

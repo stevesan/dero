@@ -63,6 +63,16 @@ class Int2:
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
+    def __ne__(self, other):
+        return not self == other
+
+    def __cmp__(self, other):
+        if self.x < other.x: return -1
+        elif self.x > other.x: return 1
+        elif self.y < other.y: return -1
+        elif self.y > other.y: return 1
+        else: return 0
+
     def __hash__(self):
         return hash((self.x,self.y))
 
@@ -81,11 +91,22 @@ class Int2:
     def __mul__(u, s):
         return Int2(u.x*s, u.y*s)
 
+    def scale(u, v):
+        return Int2(u.x * v.x, u.y * v.y)
+
     def with_y(u, y):
         return Int2(u.x, y)
 
     def with_x(u, x):
         return Int2(x, u.y)
+
+    def __getitem__(u, index):
+        if index >= 2:
+            raise ValueError('Only index values of 0 and 1 are supported by Int2. Index given: %d' % index)
+        if index == 0:
+            return u.x
+        else:
+            return u.y
 
     def yieldtest(self):
         yield 1
@@ -265,6 +286,12 @@ class Grid2:
             if self.check(nbor):
                 yield (nbor, self.pget(nbor))
 
+    def touches4(self, u, val):
+        for (v, q) in self.nbors4(u):
+            if q == val:
+                return True
+        return False
+
     def free_cells_adjacent_to(self, freeval, valueset):
         rv = []
         for (p,a) in self.piter():
@@ -429,6 +456,20 @@ class Grid2:
 
     def size(s):
         return Int2(s.W, s.H)
+
+    def floodfill(s, u, freeval, fillval):
+        assert freeval != fillval
+        queue = Queue()
+        queue.put(u)
+        while not queue.empty():
+            u = queue.get()
+            if s.pget(u) != freeval:
+                # already visited
+                continue
+            s.pset(u, fillval)
+            for (v, q) in s.nbors4(u):
+                if q == freeval:
+                    queue.put(v)
 
     @staticmethod
     def new_same_size(other, default_val):
@@ -886,12 +927,17 @@ def flip(a,b):
 def flip2(v):
     return ( v[1], v[0] )
 
-def plot_to_png(pngf):
-    pylab.figure()
-    yield None
-    pylab.grid(True)
-    pylab.savefig(pngf)
-    pylab.close()
+class figure_to_png:
+    def __init__(s, pngf):
+        s.pngf = pngf
+
+    def __enter__(s):
+        pylab.figure()
+
+    def __exit__(s, type, value, traceback):
+        pylab.grid(True)
+        pylab.savefig(s.pngf)
+        pylab.close()
 
 def argmin(xx):
     b = None
@@ -906,3 +952,161 @@ def argmax(xx):
         if not b or xx[i] > xx[b]:
             b = i
     return b
+
+def save_grid_png(G, path):
+    pylab.figure()
+    G.show_image()
+    pylab.savefig(path)
+    pylab.close()
+
+def ring_pairs(v):
+    """ calling on [A, B, C] would yield AB, BC, and CA """
+    for i in range(len(v)):
+        a = v[i]
+        b = v[ (i+1) % len(v) ]
+        yield (a,b)
+
+
+# Shamelessly copied from https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain#Python
+def convex_hull(points):
+    """Computes the convex hull of a set of 2D points.
+
+    Input: an iterable sequence of (x, y) pairs representing the points.
+    Output: a list of vertices of the convex hull in counter-clockwise order,
+      starting from the vertex with the lexicographically smallest coordinates.
+    Implements Andrew's monotone chain algorithm. O(n log n) complexity.
+    """
+
+    # Sort the points lexicographically (tuples are compared lexicographically).
+    # Remove duplicates to detect the case we have just one unique point.
+    points = sorted(set(points))
+
+    # Boring case: no points or a single point, possibly repeated multiple times.
+    if len(points) <= 1:
+        return points
+
+    # 2D cross product of OA and OB vectors, i.e. z-component of their 3D cross product.
+    # Returns a positive value, if OAB makes a counter-clockwise turn,
+    # negative for clockwise turn, and zero if the points are collinear.
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    # Build lower hull 
+    lower = []
+    for p in points:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+
+    # Build upper hull
+    upper = []
+    for p in reversed(points):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+
+    # Concatenation of the lower and upper hulls gives the convex hull.
+    # Last point of each list is omitted because it is repeated at the beginning of the other list. 
+    return lower[:-1] + upper[:-1]
+
+
+def line_points(start, end):
+    """
+    Bresenham's Line Algorithm
+    Produces a list of tuples from start and end
+    Taken from: http://www.roguebasin.com/index.php?title=Bresenham%27s_Line_Algorithm#Python
+    """
+    # Setup initial conditions
+    x1, y1 = start.astuple()
+    x2, y2 = end.astuple()
+    dx = x2 - x1
+    dy = y2 - y1
+ 
+    # Determine how steep the line is
+    is_steep = abs(dy) > abs(dx)
+ 
+    # Rotate line
+    if is_steep:
+        x1, y1 = y1, x1
+        x2, y2 = y2, x2
+ 
+    # Swap start and end points if necessary and store swap state
+    swapped = False
+    if x1 > x2:
+        x1, x2 = x2, x1
+        y1, y2 = y2, y1
+        swapped = True
+ 
+    # Recalculate differentials
+    dx = x2 - x1
+    dy = y2 - y1
+ 
+    # Calculate error
+    error = int(dx / 2.0)
+    ystep = 1 if y1 < y2 else -1
+ 
+    # Iterate over bounding box generating points between start and end
+    y = y1
+    points = []
+    for x in range(x1, x2 + 1):
+        coord = Int2(y, x) if is_steep else Int2(x, y)
+        points.append(coord)
+        error -= abs(dy)
+        if error < 0:
+            y += ystep
+            error += dx
+ 
+    # Reverse the list if the coordinates were swapped
+    if swapped:
+        points.reverse()
+    return points
+
+import timeit
+
+class profileit:
+    LEVEL = 0
+    def __init__(s, label):
+        s.label = label
+
+    def __enter__(s):
+        profileit.LEVEL += 1
+        s.t0 = timeit.default_timer()
+        print '%sBEGIN %s' % (' '*profileit.LEVEL, s.label)
+
+    def __exit__(s, type, value, traceback):
+        t1 = timeit.default_timer()
+        print '%sEND %s - took %f s' % (' '*profileit.LEVEL, s.label, t1-s.t0)
+        profileit.LEVEL -= 1
+
+def compute_convex_mask(G, freeval, fillval):
+    pts = []
+    for (u,p) in G.piter():
+        if p == fillval:
+            pts.append(u)
+
+    hull = convex_hull(pts)
+
+    # fill the convex hull and compute its area
+    # draw the borders of the hull first
+    H = Grid2.new_same_size(G, freeval)
+    for (u,v) in ring_pairs(hull):
+        for p in line_points(u,v):
+            H.pset(p, fillval)
+
+    # flood fill
+    cent = Int2.centroid(hull)
+    H.floodfill( cent, freeval, fillval )
+    return H
+
+if __name__ == '__main__':
+    with profileit("convex hull"):
+        # Example: convex hull of a 10-by-10 grid.
+        gridpts = [Int2(i//10, i%10) for i in range(100)]
+        assert convex_hull(gridpts) == [Int2(0, 0), Int2(9, 0), Int2(9, 9), Int2(0, 9)]
+
+    with profileit("line_points"):
+        points1 = line_points(Int2(0, 0), Int2(3, 4))
+        points2 = line_points(Int2(3, 4), Int2(0, 0))
+        assert(set(points1) == set(points2))
+        assert points1 == [Int2(0, 0), Int2(1, 1), Int2(1, 2), Int2(2, 3), Int2(3, 4)]
+        assert points2 == [Int2(3, 4), Int2(2, 3), Int2(1, 2), Int2(1, 1), Int2(0, 0)]
