@@ -139,3 +139,7 @@ think: maybe we need another parameter, to control how many "holes" show up.
     specifically, dents are free cells that can reach the convex hull
     and holes cannot.
     so maybe convexity should only control the 'dents', and another parameter should control holes.
+
+aspect ratios:
+    don't quite like randomizing aspect ratio to vary how thin/flat shapes are.
+    would be better to control the spread algo to favor one or the other during its next-spread sampling
