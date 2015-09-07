@@ -246,7 +246,7 @@ class Grid2:
 # pylab.imshow(matrix)
 
     def show_image(self):
-        matrix = numpy.ndarray([self.W,self.H])
+        matrix = numpy.ndarray([self.H,self.W])
         scalarVal = 0.0
         val2scalar = {}
         uniques = self.unique_values()
@@ -261,13 +261,13 @@ class Grid2:
 # pylab.imshow(matrix)
 
     def iter(self):
-        for y in range(self.W):
-            for x in range(self.H):
+        for y in range(self.H):
+            for x in range(self.W):
                 yield (x,y)
 
     def piter(self):
-        for y in range(self.W):
-            for x in range(self.H):
+        for y in range(self.H):
+            for x in range(self.W):
                 yield (Int2(x,y), self.get(x,y))
 
     def piter_rand(self):

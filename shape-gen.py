@@ -148,35 +148,54 @@ def test_y_symmetry():
     G.printself()
     print compute_symmetry(G, axis)
 
+def fixed_point_iterate(steps):
+    """ each step should return True if it changed the state """
+    modded = True
+    while modded:
+        modded = False
+        for step in steps:
+            modded = modded or step()
+
+def clamp01(x):
+    return max(0.0, min(1.0, x))
 
 if __name__ == '__main__':
     test_symmetry()
     test_y_symmetry()
 
-    min_xsym = float(sys.argv[1])
-    min_ysym = float(sys.argv[2])
-    min_convex = float(sys.argv[3])
-    L = 41
-    sym_axis = Int2(0,1)
 
+    for i in range(20):
+        # means and stdevs are hand-tuned
+        # good params are, xs=0.0, ys=1.0, cv=0.95
+        # so these gamma distributions are meant to typically yield values around those
+        # min_xsym = clamp01(random.gammavariate(1.0, 2.0)/20.0 * 1.0)
+        # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
+        # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
+        min_xsym, min_ysym, min_convex = (0, 1, 0.95)
+    
+        print min_xsym, min_ysym, min_convex
 
+        width = 2*random.randint(2, 20) + 1
+        height = 2*random.randint(2, 20) + 1
 
-    G = Grid2(L,L,FREE)
-    cent = Int2(L/2, L/2)
-    G.pset(cent, FILL)
-    seed_spread([FILL], 0, G, FREE, L*L/3)
+        G = Grid2(width,height,FREE)
+        cent = Int2(width/2, height/2)
+        G.pset(cent, FILL)
+        seed_spread([FILL], 0, G, FREE, width*height/3)
 
-    save_grid_png(G, 'before-enforcements.png')
+        def print_status():
+            print 'xsym %f \t ysym %f \t convex %f' % (
+                    compute_symmetry( G, Int2(1,0) ),
+                    compute_symmetry( G, Int2(0,1) ),
+                    compute_convexity( G ))
+            return False
 
-    modded = True
-    while modded:
-        print 'x-symmetry', compute_symmetry(G, Int2(1,0))
-        print 'y-symmetry', compute_symmetry(G, Int2(0,1))
-        print 'convexity', compute_convexity(G)
-        modded = False
-        modded = modded or enforce_symmetry(G, min_xsym, Int2(1,0), True)
-        modded = modded or enforce_symmetry(G, min_ysym, Int2(0,1), True)
-        modded = modded or enforce_convexity(G, min_convex)
+        fixed_point_iterate([
+                lambda : print_status(),
+                lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True),
+                lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True),
+                lambda : enforce_convexity(G, min_convex)
+                ])
 
-    save_grid_png(G, 'final.png')
-    G.printself()
+        save_grid_png(G, 'shape-%d.png' % i)
+        G.printself()
