@@ -10,7 +10,6 @@ import sys
 from euclid import *
 import wad
 
-
 def char_times(c, x):
     rv = ''
     for i in range(x):
@@ -99,6 +98,12 @@ class Int2:
 
     def with_x(u, x):
         return Int2(x, u.y)
+
+    def abs(u):
+        return Int2(abs(u.x), abs(u.y))
+
+    def dot(u,v):
+        return u.x*v.x + u.y*v.y
 
     def __getitem__(u, index):
         if index >= 2:
@@ -1078,25 +1083,21 @@ class profileit:
         print '%sEND %s - took %f s' % (' '*profileit.LEVEL, s.label, t1-s.t0)
         profileit.LEVEL -= 1
 
-def compute_convex_mask(G, freeval, fillval):
+def compute_convex_mask(G, fillval):
+    mask = Grid2.new_same_size(G, False)
+
     pts = []
     for (u,p) in G.piter():
         if p == fillval:
             pts.append(u)
 
     hull = convex_hull(pts)
-
-    # fill the convex hull and compute its area
-    # draw the borders of the hull first
-    H = Grid2.new_same_size(G, freeval)
     for (u,v) in ring_pairs(hull):
         for p in line_points(u,v):
-            H.pset(p, fillval)
+            mask.pset(p, True)
 
-    # flood fill
-    cent = Int2.centroid(hull)
-    H.floodfill( cent, freeval, fillval )
-    return H
+    mask.floodfill( Int2.centroid(hull), False, True )
+    return mask
 
 if __name__ == '__main__':
     with profileit("convex hull"):
