@@ -115,8 +115,6 @@ clear_paths should be responsible for the exact paths.
 tunnels too long
     need to fit shapes together, rather than innital region-spread method
 area shapes too concave
-----------------------------------------
-
 SHAPE GEN: need shape generator with continuous parameters:
     convexity
     symmetry
@@ -126,7 +124,6 @@ SHAPE GEN: need shape generator with continuous parameters:
 ALWAYS REMEMBER: it's not just about what's "possible" it's about controlling the *distribution*
     random blobs make anything like this possible, but not necessarily likely.
 
-
 regular n-gons have n axis of symmetry
 
 partial symmetry:
@@ -134,3 +131,11 @@ partial symmetry:
 symmetry def:
 N = number of fills
 count how many fills do not have reflected pairs
+----------------------------------------
+
+
+think: maybe we need another parameter, to control how many "holes" show up.
+    i feel like finite convexity should result in "dents" but not in "holes"
+    specifically, dents are free cells that can reach the convex hull
+    and holes cannot.
+    so maybe convexity should only control the 'dents', and another parameter should control holes.

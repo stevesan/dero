@@ -159,6 +159,23 @@ def fixed_point_iterate(steps):
 def clamp01(x):
     return max(0.0, min(1.0, x))
 
+def lerp(a, b, t):
+    return a + t*(b-a)
+
+def ceilodd(x):
+    if x % 2 == 0:
+        return x+1
+    else:
+        return x
+
+def quadratic_formula(a, b, c):
+    dis = b*b - 4*a*c
+    if dis < 0:
+        return (None, None)
+    else:
+        return ( (-1*b + math.sqrt(dis)) / (2*a),
+                (-1*b - math.sqrt(dis)) / (2*a))
+
 if __name__ == '__main__':
     test_symmetry()
     test_y_symmetry()
@@ -175,8 +192,15 @@ if __name__ == '__main__':
     
         print min_xsym, min_ysym, min_convex
 
-        width = 2*random.randint(2, 20) + 1
-        height = 2*random.randint(2, 20) + 1
+        delta = int(lerp( -60, 60, random.random() ))
+        # 1600 = x * y
+        # 1600 = x * (x+delta)
+        # 0 = x^2 + delta*x - 1600
+        width = int(math.ceil(max(quadratic_formula(1, delta, -1600))))
+        height = width + delta
+
+        width = ceilodd(width)
+        height = ceilodd(height)
 
         G = Grid2(width,height,FREE)
         cent = Int2(width/2, height/2)
