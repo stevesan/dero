@@ -38,7 +38,21 @@ def compute_convexity( G ):
     # H.printself()
     # save_grid_png(H, 'hull.png')
 
+    print 'compute_convexity: 1.0 - %d / %d' % (cavityarea, hullarea)
+
     return convexity
+
+def compute_outside_mask(G):
+    """ A cell is 'outside' if it's 1) free and 2) reachable from the border via other free cells """
+    M = Grid2.new_same_size(G, False)
+    def check_edge(u,v):
+        return G.pget(v) == FREE and not M.pget(v)
+    for u in G.iterborder():
+        if G.pget(u) == FREE:
+            for v in G.bfs(u, check_edge, 4):
+                M.pset(v, True)
+
+    return M
 
 def enforce_symmetry(G, min_symmetry, axis, force_contiguous):
     """ returns true if G was modified """
@@ -94,13 +108,19 @@ def enforce_symmetry(G, min_symmetry, axis, force_contiguous):
 def enforce_convexity(G, min_convexity):
     """ returns true if G was modified """
     H = compute_convex_mask(G, FILL)
+    outside = compute_outside_mask(G)
     hullarea = 0
     cavities = []
     for (u,in_hull) in H.piter():
         if in_hull:
             hullarea += 1
-            if G.pget(u) != FILL:
+            if G.pget(u) != FILL and outside.pget(u):
                 cavities += [u]
+
+    # TEMP TEMP fill all non-outside holes
+    for (u, p) in G.piter():
+        if not outside.pget(u):
+            G.pset(u, FILL)
 
     def curr_convexity():
         return 1.0 - len(cavities) * 1.0 / hullarea
@@ -154,7 +174,8 @@ def fixed_point_iterate(steps):
     while modded:
         modded = False
         for step in steps:
-            modded = modded or step()
+            thismodded = step()
+            modded = modded or thismodded
 
 def clamp01(x):
     return max(0.0, min(1.0, x))
@@ -176,6 +197,16 @@ def quadratic_formula(a, b, c):
         return ( (-1*b + math.sqrt(dis)) / (2*a),
                 (-1*b - math.sqrt(dis)) / (2*a))
 
+def random_width_height(min_delta, max_delta):
+    assert min_delta < max_delta
+    delta = int(lerp( min_delta, max_delta, random.random() ))
+    # 1600 = x * y
+    # 1600 = x * (x+delta)
+    # 0 = x^2 + delta*x - 1600
+    width = int(math.ceil(max(quadratic_formula(1, delta, -1600))))
+    height = width + delta
+    return (width, height)
+
 if __name__ == '__main__':
     test_symmetry()
     test_y_symmetry()
@@ -188,24 +219,20 @@ if __name__ == '__main__':
         # min_xsym = clamp01(random.gammavariate(1.0, 2.0)/20.0 * 1.0)
         # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
         # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
-        min_xsym, min_ysym, min_convex = (0, 1, 0.95)
+        # min_xsym, min_ysym, min_convex = (0, 1, 1.0)
+        min_xsym, min_ysym, min_convex = (0.5, 1, 0.90)
     
-        print min_xsym, min_ysym, min_convex
+        print 'constraint parameters:', min_xsym, min_ysym, min_convex
 
-        delta = int(lerp( -60, 60, random.random() ))
-        # 1600 = x * y
-        # 1600 = x * (x+delta)
-        # 0 = x^2 + delta*x - 1600
-        width = int(math.ceil(max(quadratic_formula(1, delta, -1600))))
-        height = width + delta
-
+        width = 75
+        height = 75
         width = ceilodd(width)
         height = ceilodd(height)
 
         G = Grid2(width,height,FREE)
         cent = Int2(width/2, height/2)
         G.pset(cent, FILL)
-        seed_spread([FILL], 0, G, FREE, width*height/3)
+        seed_spread([FILL], 0, G, FREE, width*height/4)
 
         def print_status():
             print 'xsym %f \t ysym %f \t convex %f' % (
@@ -215,10 +242,10 @@ if __name__ == '__main__':
             return False
 
         fixed_point_iterate([
-                lambda : print_status(),
                 lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True),
                 lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True),
-                lambda : enforce_convexity(G, min_convex)
+                lambda : enforce_convexity(G, min_convex),
+                lambda : print_status()
                 ])
 
         save_grid_png(G, 'shape-%d.png' % i)

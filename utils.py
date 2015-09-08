@@ -476,10 +476,40 @@ class Grid2:
                 if q == freeval:
                     queue.put(v)
 
+    def bfs(s, start, check_edge, nborcount):
+        queue = Queue()
+        visited = Grid2.new_same_size(s, False)
+
+        if nborcount == 4:
+            nborfunc = Grid2.nbors4
+        else:
+            nborfunc = Grid2.nbors8
+
+        queue.put(start)
+        visited.pset(start, True)
+        while not queue.empty():
+            u = queue.get()
+            yield u
+            for (v, q) in nborfunc(s, u):
+                if not visited.pget(v) and check_edge(u,v):
+                    queue.put(v)
+                    visited.pset(v, True)
+
+    def iterborder(s):
+        for y in range(s.H):
+            yield Int2(s.W-1, y)
+        for x in range(s.W):
+            yield Int2(x, s.H-1)
+        for y in range(s.H):
+            yield Int2(0, y)
+        for x in range(s.W):
+            yield Int2(x, 0)
+
     @staticmethod
     def new_same_size(other, default_val):
         g = Grid2(other.W, other.H, default_val)
         return g
+
 
 EDGE_TO_NORM = [
     Int2(1, 0),

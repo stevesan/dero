@@ -131,15 +131,24 @@ partial symmetry:
 symmetry def:
 N = number of fills
 count how many fills do not have reflected pairs
-----------------------------------------
-
 
 think: maybe we need another parameter, to control how many "holes" show up.
     i feel like finite convexity should result in "dents" but not in "holes"
     specifically, dents are free cells that can reach the convex hull
     and holes cannot.
     so maybe convexity should only control the 'dents', and another parameter should control holes.
+    TEMP: for now, just removing ALL holes completely.
+----------------------------------------
 
 aspect ratios:
     don't quite like randomizing aspect ratio to vary how thin/flat shapes are.
     would be better to control the spread algo to favor one or the other during its next-spread sampling
+
+ok enforcing convexity is good...but it still kinda sucks.
+we want our concavity, if any, to be smooth.
+what if we took a frequency space approach?
+or maybe simpler..do a "wall smoothing" step?
+we could run some kind of...median-like filter thing over it all.
+
+need another knob: boxiness. definitely, a good amount of shapes in levels are box-like
+    this is easy. just compute bounding box and treat like convexity enforcement.
