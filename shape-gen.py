@@ -267,7 +267,7 @@ if __name__ == '__main__':
         # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
         # min_xsym, min_ysym, min_convex = (0, 1, 1.0)
         # heads: min_xsym, min_ysym, min_convex = (0.5, 1, 0.90)
-        min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.95, 1.0)
+        min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.95, 0.9)
     
         print 'constraint parameters:', min_xsym, min_ysym, min_convex
 
