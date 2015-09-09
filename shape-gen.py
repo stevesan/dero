@@ -118,6 +118,7 @@ def enforce_convexity(G, min_convexity):
                 cavities += [u]
 
     # TEMP TEMP fill all non-outside holes
+    # or maybe not so temp..this works quite well
     for (u, p) in G.piter():
         if not outside.pget(u):
             G.pset(u, FILL)
@@ -128,6 +129,51 @@ def enforce_convexity(G, min_convexity):
     modded = False
     while curr_convexity() < min_convexity:
         # find a cavity to fill, but only if it's adjacent to an existing fill
+        eligible = []
+        for u in cavities:
+            if G.touches4(u, FILL):
+                eligible += [u]
+
+        lucky = random.choice(eligible)
+        cavities.remove(lucky)
+        G.pset( lucky, FILL )
+        modded = True
+
+    return modded
+
+def enforce_min_nbors(G, min_nbors, on_value, off_value):
+    modded = False
+    freethese = []
+    for (u, p) in G.piter():
+        if p != on_value: continue
+        count = 0
+        for (v, q) in G.nbors4(u):
+            if q == on_value: count+= 1
+
+        if count < min_nbors:
+            freethese.append(u)
+            modded = True
+
+    for u in freethese:
+        G.pset(u, off_value)
+    return modded
+
+def enforce_boxiness(G, min_boxiness):
+    bbox = G.bbox(lambda p : p == FILL)
+    print bbox
+
+    cavities = []
+    numfills = 0
+    for (u, p) in G.piter():
+        if p == FREE and bbox.contains(u):
+            cavities += [u]
+        elif p == FILL:
+            numfills += 1
+
+    def curr_boxiness():
+        return 1.0 - len(cavities)*1.0/numfills
+    modded = False
+    while curr_boxiness() < min_boxiness:
         eligible = []
         for u in cavities:
             if G.touches4(u, FILL):
@@ -220,7 +266,8 @@ if __name__ == '__main__':
         # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
         # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
         # min_xsym, min_ysym, min_convex = (0, 1, 1.0)
-        min_xsym, min_ysym, min_convex = (0.5, 1, 0.90)
+        # heads: min_xsym, min_ysym, min_convex = (0.5, 1, 0.90)
+        min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.95, 1.0)
     
         print 'constraint parameters:', min_xsym, min_ysym, min_convex
 
@@ -245,6 +292,9 @@ if __name__ == '__main__':
                 lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True),
                 lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True),
                 lambda : enforce_convexity(G, min_convex),
+                lambda : enforce_boxiness(G, min_boxiness),
+                lambda : enforce_min_nbors(G, 2, FREE, FILL),
+                lambda : enforce_min_nbors(G, 2, FILL, FREE),
                 lambda : print_status()
                 ])
 

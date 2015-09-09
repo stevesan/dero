@@ -66,11 +66,26 @@ class Int2:
         return not self == other
 
     def __cmp__(self, other):
+        """ lexographic compare """
         if self.x < other.x: return -1
         elif self.x > other.x: return 1
         elif self.y < other.y: return -1
         elif self.y > other.y: return 1
         else: return 0
+
+    def all_lt(self, other):
+        """ true if all components of self are less-than components of other """
+        return self.x < other.x and self.y < other.y
+
+    def all_gt(self, other):
+        """ true if all components of self are greater-than components of other """
+        return self.x > other.x and self.y > other.y
+
+    def all_lte(self, other):
+        return self.x <= other.x and self.y <= other.y
+
+    def all_gte(self, other):
+        return self.x >= other.x and self.y >= other.y
 
     def __hash__(self):
         return hash((self.x,self.y))
@@ -190,6 +205,17 @@ class Int2:
         for x in range(a.x, b.x+1):
             for y in range(a.y, b.y+1):
                 yield Int2(x,y)
+
+    @staticmethod
+    def min(a, b):
+        """ Component-wise min """
+        return Int2( min(a.x, b.x), min(a.y, b.y) )
+
+    @staticmethod
+    def max(a, b):
+        """ Component-wise max """
+        return Int2( max(a.x, b.x), max(a.y, b.y) )
+
 
 class Grid2:
     def __init__(self,_W, _H, default):
@@ -505,10 +531,43 @@ class Grid2:
         for x in range(s.W):
             yield Int2(x, 0)
 
+    def bbox(s, select):
+        rv = Bounds2.new_inf()
+        for (u, p) in s.piter():
+            if select(p):
+                rv = rv.including(u)
+
+        return rv
+
     @staticmethod
     def new_same_size(other, default_val):
         g = Grid2(other.W, other.H, default_val)
         return g
+
+
+class Bounds2(object):
+
+    def __init__(s, mins, maxs):
+        s.mins = mins
+        s.maxs = maxs
+
+    def __str__(s):
+        return '%s->%s' % (s.mins, s.maxs)
+
+    def __repr__(s):
+        return 'Box2(%s, %s)' % (s.mins, s.maxs)
+
+    def including(s, u):
+        return Bounds2( Int2.min(s.mins, u), Int2.max(s.maxs, u) )
+
+    def contains(s, u):
+        """ inclusive """
+        return s.mins.all_lte(u) and u.all_lte(s.maxs)
+
+    @staticmethod
+    def new_inf():
+        inf = float('inf')
+        return Bounds2( Int2(inf, inf), Int2(inf, inf) * -1 )
 
 
 EDGE_TO_NORM = [
