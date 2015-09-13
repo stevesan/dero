@@ -138,17 +138,36 @@ think: maybe we need another parameter, to control how many "holes" show up.
     and holes cannot.
     so maybe convexity should only control the 'dents', and another parameter should control holes.
     TEMP: for now, just removing ALL holes completely.
+need another knob: boxiness. definitely, a good amount of shapes in levels are box-like
+    this is easy. just compute bounding box and treat like convexity enforcement.
+ok enforcing convexity is good...but it still kinda sucks.
+we want our concavity, if any, to be smooth.
+what if we took a frequency space approach?
+or maybe simpler..do a "wall smoothing" step?
+we could run some kind of...median-like filter thing over it all.
+    write now i'm just doing min-nbor-count. works well enough.
 ----------------------------------------
 
 aspect ratios:
     don't quite like randomizing aspect ratio to vary how thin/flat shapes are.
     would be better to control the spread algo to favor one or the other during its next-spread sampling
 
-ok enforcing convexity is good...but it still kinda sucks.
-we want our concavity, if any, to be smooth.
-what if we took a frequency space approach?
-or maybe simpler..do a "wall smoothing" step?
-we could run some kind of...median-like filter thing over it all.
+non-full symmetry looks pretty bad. we really want the non-symmetric parts clustered.
+    like a single semi-circle sticking out one side or something. not some random unmatched cells scattered around the border.
+    could we accomplish this by clustering..like, when increasing symmetry, choose an 'anchor' point, and spread points prioritized by dist-to-anchor?
 
-need another knob: boxiness. definitely, a good amount of shapes in levels are box-like
-    this is easy. just compute bounding box and treat like convexity enforcement.
+    hmm..or maybe cells are too fine of a medium to do this kind of shape creation...
+
+quick: diagonal symmetry
+
+can also just create some "wormy" spaces by directly spread-filling unused space after shape-overlap resolve.
+
+another observation: we don't need to strictly enforce all these metrics. we could just sometimes be OK with one of them not being met.
+    it's really about what we're trying to achieve, rather than what is actually achieved. art does not need to be perfect.
+
+concerning our puzzle designer: it doesn't really provide "loops". we should allow cycles, and thus loops, for key-finding treks.
+
+zone shapes:
+    we could combine our shape gen with spreading... first gen shapes, then shove them together, then choose half the shapes to 'spread' some amount.
+    this results in 'tight packing' while the ones that aren't spread get some non-symmetry and non-convexity that isn't totally random either (cuz they're shaped by their context)
+    this 'fill spread' can be symmetric too

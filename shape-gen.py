@@ -160,7 +160,6 @@ def enforce_min_nbors(G, min_nbors, on_value, off_value):
 
 def enforce_boxiness(G, min_boxiness):
     bbox = G.bbox(lambda p : p == FILL)
-    print bbox
 
     cavities = []
     numfills = 0
@@ -214,14 +213,20 @@ def test_y_symmetry():
     G.printself()
     print compute_symmetry(G, axis)
 
-def fixed_point_iterate(steps):
+def fixed_point_iterate(steps, max_steps):
+    assert type(steps) == list
+    assert type(max_steps) == int
     """ each step should return True if it changed the state """
     modded = True
-    while modded:
+    num_steps = 0
+    while modded and num_steps < max_steps:
         modded = False
-        for step in steps:
-            thismodded = step()
+        for (label, func) in steps:
+            with PROFILE(label):
+                thismodded = func()
             modded = modded or thismodded
+
+        num_steps += 1
 
 def clamp01(x):
     return max(0.0, min(1.0, x))
@@ -257,46 +262,49 @@ if __name__ == '__main__':
     test_symmetry()
     test_y_symmetry()
 
-
     for i in range(20):
-        # means and stdevs are hand-tuned
-        # good params are, xs=0.0, ys=1.0, cv=0.95
-        # so these gamma distributions are meant to typically yield values around those
-        # min_xsym = clamp01(random.gammavariate(1.0, 2.0)/20.0 * 1.0)
-        # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
-        # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
-        # min_xsym, min_ysym, min_convex = (0, 1, 1.0)
-        # heads: min_xsym, min_ysym, min_convex = (0.5, 1, 0.90)
-        min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.95, 0.9)
-    
-        print 'constraint parameters:', min_xsym, min_ysym, min_convex
+        with PROFILE('shape %d' % i):
+            # means and stdevs are hand-tuned
+            # good params are, xs=0.0, ys=1.0, cv=0.95
+            # so these gamma distributions are meant to typically yield values around those
+            # min_xsym = clamp01(random.gammavariate(1.0, 2.0)/20.0 * 1.0)
+            # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
+            # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
+            # min_xsym, min_ysym, min_convex, min_boxiness = (0, 1, 1.0, 0.0)
+            # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.90, 0.0)
+            # min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.98, 0.8)
+            # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.95, 0.0)  # best 9/10
+            min_xsym, min_ysym, min_convex, min_boxiness = (random.random(), 1.0, 0.8, 0.0)
+        
+            print 'constraint parameters:', min_xsym, min_ysym, min_convex
 
-        width = 75
-        height = 75
-        width = ceilodd(width)
-        height = ceilodd(height)
+            width = 75
+            height = 75
+            width = ceilodd(width)
+            height = ceilodd(height)
 
-        G = Grid2(width,height,FREE)
-        cent = Int2(width/2, height/2)
-        G.pset(cent, FILL)
-        seed_spread([FILL], 0, G, FREE, width*height/4)
+            G = Grid2(width,height,FREE)
+            cent = Int2(width/2, height/2)
+            G.pset(cent, FILL)
+            with PROFILE('spread'):
+                seed_spread([FILL], 0, G, FREE, width*height/4)
 
-        def print_status():
-            print 'xsym %f \t ysym %f \t convex %f' % (
-                    compute_symmetry( G, Int2(1,0) ),
-                    compute_symmetry( G, Int2(0,1) ),
-                    compute_convexity( G ))
-            return False
+            def print_status():
+                print 'xsym %f \t ysym %f \t convex %f' % (
+                        compute_symmetry( G, Int2(1,0) ),
+                        compute_symmetry( G, Int2(0,1) ),
+                        compute_convexity( G ))
+                return False
 
-        fixed_point_iterate([
-                lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True),
-                lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True),
-                lambda : enforce_convexity(G, min_convex),
-                lambda : enforce_boxiness(G, min_boxiness),
-                lambda : enforce_min_nbors(G, 2, FREE, FILL),
-                lambda : enforce_min_nbors(G, 2, FILL, FREE),
-                lambda : print_status()
-                ])
+            fixed_point_iterate([
+                    ('xsym', lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True)),
+                    ('ysym', lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True)),
+                    ('conv', lambda : enforce_convexity(G, min_convex)),
+                    ('box', lambda : enforce_boxiness(G, min_boxiness)),
+                    ('nborsout', lambda : enforce_min_nbors(G, 2, FREE, FILL)),
+                    ('nborsin', lambda : enforce_min_nbors(G, 2, FILL, FREE)),
+                    ('eval', lambda : print_status()) ],
+                    3 )
 
-        save_grid_png(G, 'shape-%d.png' % i)
-        G.printself()
+            save_grid_png(G, 'shape-%d.png' % i)
+            G.printself()

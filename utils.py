@@ -1157,20 +1157,20 @@ def line_points(start, end):
 
 import timeit
 
-class profileit:
+class PROFILE:
     LEVEL = 0
     def __init__(s, label):
         s.label = label
 
     def __enter__(s):
-        profileit.LEVEL += 1
+        PROFILE.LEVEL += 1
         s.t0 = timeit.default_timer()
-        print '%sBEGIN %s' % (' '*profileit.LEVEL, s.label)
+        # print '%sBEGIN %s' % (' '*PROFILE.LEVEL, s.label)
 
     def __exit__(s, type, value, traceback):
         t1 = timeit.default_timer()
-        print '%sEND %s - took %f s' % (' '*profileit.LEVEL, s.label, t1-s.t0)
-        profileit.LEVEL -= 1
+        print '%sEND %s - took %f s' % (' '*PROFILE.LEVEL, s.label, t1-s.t0)
+        PROFILE.LEVEL -= 1
 
 def compute_convex_mask(G, fillval):
     mask = Grid2.new_same_size(G, False)
@@ -1189,12 +1189,12 @@ def compute_convex_mask(G, fillval):
     return mask
 
 if __name__ == '__main__':
-    with profileit("convex hull"):
+    with PROFILE("convex hull"):
         # Example: convex hull of a 10-by-10 grid.
         gridpts = [Int2(i//10, i%10) for i in range(100)]
         assert convex_hull(gridpts) == [Int2(0, 0), Int2(9, 0), Int2(9, 9), Int2(0, 9)]
 
-    with profileit("line_points"):
+    with PROFILE("line_points"):
         points1 = line_points(Int2(0, 0), Int2(3, 4))
         points2 = line_points(Int2(3, 4), Int2(0, 0))
         assert(set(points1) == set(points2))
