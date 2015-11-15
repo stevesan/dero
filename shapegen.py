@@ -258,53 +258,86 @@ def random_width_height(min_delta, max_delta):
     height = width + delta
     return (width, height)
 
+def create_shape(width, height):
+    # means and stdevs are hand-tuned
+    # good params are, xs=0.0, ys=1.0, cv=0.95
+    # so these gamma distributions are meant to typically yield values around those
+    # min_xsym = clamp01(random.gammavariate(1.0, 2.0)/20.0 * 1.0)
+    # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
+    # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
+    # min_xsym, min_ysym, min_convex, min_boxiness = (0, 1, 1.0, 0.0)
+    # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.90, 0.0)
+    # min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.98, 0.8)
+    min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.95, 0.0)  # best 9/10
+    # min_xsym, min_ysym, min_convex, min_boxiness = (random.random(), 1.0, 0.95, 0.0)
+
+    width = ceilodd(width)
+    height = ceilodd(height)
+
+    G = Grid2(width,height,FREE)
+    cent = Int2(width/2, height/2)
+    G.pset(cent, FILL)
+    # initial random spread step
+    with PROFILE('spread'):
+        seed_spread([FILL], 0, G, FREE, width*height/4)
+
+    def print_status():
+        print 'xsym %f \t ysym %f \t convex %f' % (
+                compute_symmetry( G, Int2(1,0) ),
+                compute_symmetry( G, Int2(0,1) ),
+                compute_convexity( G ))
+        return False
+
+    fixed_point_iterate([
+            ('xsym', lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True)),
+            ('ysym', lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True)),
+            ('conv', lambda : enforce_convexity(G, min_convex)),
+            ('box', lambda : enforce_boxiness(G, min_boxiness)),
+            ('nborsout', lambda : enforce_min_nbors(G, 2, FREE, FILL)),
+            ('nborsin', lambda : enforce_min_nbors(G, 2, FILL, FREE)),
+            ('eval', lambda : print_status()) ],
+            3 )
+
+    return G
+
+def create_clump_of_shapes(width, height, shape_rows, shape_cols):
+    F = 2
+    sw = int(math.floor(width/shape_cols/F))
+    sh = int(math.floor(height/shape_rows/F))
+    G = Grid2(width, height, FREE)
+    center = Int2(width/2, height/2)
+    shapes = []
+
+    shape_dims = Int2(shape_cols, shape_rows)
+    shape_id = 0
+    for shape_coord in shape_dims.range():
+        shape_ofs = shape_coord.scale(Int2(sw, sh)*F)
+        print 'shape %s %s' % (shape_coord, shape_ofs)
+        shape_grid = create_shape(sw, sh)
+        for (u, p) in shape_grid.piter():
+            if p == FILL:
+                G[ shape_ofs + u ] = shape_id
+        shape = GridShape(G, shape_id)
+        shapes += [shape]
+        shape_id += 1
+
+    steps = 0
+    while True:
+        G.save_png("clump step %d.png" % steps)
+        steps += 1
+        random.shuffle(shapes)
+        movedarr = [s.move_towards(center, FREE) for s in shapes];
+        if not any(movedarr):
+            break
+
+    return (G, shapes)
+
 if __name__ == '__main__':
     test_symmetry()
     test_y_symmetry()
 
     for i in range(20):
         with PROFILE('shape %d' % i):
-            # means and stdevs are hand-tuned
-            # good params are, xs=0.0, ys=1.0, cv=0.95
-            # so these gamma distributions are meant to typically yield values around those
-            # min_xsym = clamp01(random.gammavariate(1.0, 2.0)/20.0 * 1.0)
-            # min_ysym = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.2)
-            # min_convex = clamp01(1.0 - random.gammavariate(1.0, 2.0)/20.0 * 0.10)
-            # min_xsym, min_ysym, min_convex, min_boxiness = (0, 1, 1.0, 0.0)
-            # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.90, 0.0)
-            # min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.98, 0.8)
-            # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.95, 0.0)  # best 9/10
-            min_xsym, min_ysym, min_convex, min_boxiness = (random.random(), 1.0, 0.95, 0.0)
-        
-            print 'constraint parameters:', min_xsym, min_ysym, min_convex
-
-            width = 75
-            height = 75
-            width = ceilodd(width)
-            height = ceilodd(height)
-
-            G = Grid2(width,height,FREE)
-            cent = Int2(width/2, height/2)
-            G.pset(cent, FILL)
-            with PROFILE('spread'):
-                seed_spread([FILL], 0, G, FREE, width*height/4)
-
-            def print_status():
-                print 'xsym %f \t ysym %f \t convex %f' % (
-                        compute_symmetry( G, Int2(1,0) ),
-                        compute_symmetry( G, Int2(0,1) ),
-                        compute_convexity( G ))
-                return False
-
-            fixed_point_iterate([
-                    ('xsym', lambda : enforce_symmetry(G, min_xsym, Int2(1,0), True)),
-                    ('ysym', lambda : enforce_symmetry(G, min_ysym, Int2(0,1), True)),
-                    ('conv', lambda : enforce_convexity(G, min_convex)),
-                    ('box', lambda : enforce_boxiness(G, min_boxiness)),
-                    ('nborsout', lambda : enforce_min_nbors(G, 2, FREE, FILL)),
-                    ('nborsin', lambda : enforce_min_nbors(G, 2, FILL, FREE)),
-                    ('eval', lambda : print_status()) ],
-                    3 )
-
+            G = create_shape( 75, 75 )
             save_grid_png(G, 'shape-%d.png' % i)
             G.printself()

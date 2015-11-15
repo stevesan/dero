@@ -6,8 +6,8 @@ import math
 import scipy
 from scipy.cluster.vq import kmeans
 import sys
-from planar import Vec2
 from utils import *
+from euclid import *
 import dero_config
 import noise
 import wad
@@ -108,7 +108,7 @@ def cluster_verts_test():
 # TODO call whiten here??
     (centroids, distortion) = kmeans(posMatrix, numGroups)
 
-    centersVecArray = [Vec2(row[0], row[1]) for row in centroids]
+    centersVecArray = [Vector2(row[0], row[1]) for row in centroids]
 
     nodeGroup = assign_nearest_center(nodePos, centersVecArray)
 
@@ -636,11 +636,12 @@ def test_polygonate_perlin():
     pylab.show()
 
 def test_quat_turns():
-    print Int2(1,0).turn(0)
-    print Int2(1,0).turn(1)
-    print Int2(1,0).turn(2)
-    print Int2(1,0).turn(3)
-    print Int2(1,0).turn(1).turn(1).turn(1).turn(1)
+    assert Int2(1,0).turn(0) == Int2(1,0)
+    assert Int2(1,0).turn(1) == Int2(0,1)
+    assert Int2(1,0).turn(2) == Int2(-1,0)
+    assert Int2(1,0).turn(3) == Int2(0,-1)
+    assert Int2(1,0).turn(4) == Int2(1,0)
+    assert Int2(1,0).turn(5) == Int2(1,0).turn(1)
 
 def test_left_vert():
     poly = [left_vert(Int2(0,2), edge) for edge in range(4)]

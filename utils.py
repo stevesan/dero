@@ -4,7 +4,6 @@ import math
 import pylab
 import random
 import noise
-from planar import Vec2
 from Queue import *
 import sys
 from euclid import *
@@ -63,6 +62,9 @@ class Int2:
         self.x = _x
         self.y = _y
 
+    def to_float(s):
+        return Vector2(s.x, s.y)
+
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
@@ -97,6 +99,9 @@ class Int2:
     def __repr__(self):
         return 'Int2(%d,%d)' % (self.x, self.y)
 
+    def __str__(self):
+        return self.__repr__()
+
     def __add__(u,v):
         return Int2(u.x+v.x, u.y+v.y)
 
@@ -124,6 +129,9 @@ class Int2:
     def dot(u,v):
         return u.x*v.x + u.y*v.y
 
+    def is_zero(u):
+        return u.x == 0 and u.y == 0
+
     def __getitem__(u, index):
         if index >= 2:
             raise ValueError('Only index values of 0 and 1 are supported by Int2. Index given: %d' % index)
@@ -131,10 +139,6 @@ class Int2:
             return u.x
         else:
             return u.y
-
-    def yieldtest(self):
-        yield 1
-        yield 2
 
     def yield_4nbors(self):
         """ in ccw order """
@@ -165,6 +169,11 @@ class Int2:
         p = self
         for i in numpy.random.permutation(8):
             yield Int2(p.x+nbor8dx[i], p.y+nbor8dy[i])
+
+    def range(self):
+        for x in range(self.x):
+            for y in range(self.y):
+                yield Int2(x,y)
 
     def astuple(self):
         return (self.x, self.y)
@@ -276,6 +285,12 @@ class Grid2:
 
     def debug_print(self):
         self.printself()
+
+    def save_png(G, path):
+        pylab.figure()
+        G.show_image()
+        pylab.savefig(path)
+        pylab.close()
 
     def printself(self):
         # first compute widest string
@@ -607,6 +622,9 @@ class GridShape(object):
         return s.centroid
 
     def move_towards(s, goal, free_val):
+        delta = goal - s.get_centroid()
+        if delta.is_zero():
+            return False
         dirr = Int2.delta_to_direction( goal - s.get_centroid() )
         if s.check_move(dirr, lambda x : x == free_val):
             s.do_move(dirr, free_val)
@@ -654,6 +672,9 @@ class Bounds2(object):
         inf = float('inf')
         return Bounds2( Int2(inf, inf), Int2(inf, inf) * -1 )
 
+    @staticmethod
+    def from_center_dims(center, dims):
+        return Bounds2( center-dims/2, center+dims/2 )
 
 EDGE_TO_NORM = [
     Int2(1, 0),
@@ -690,7 +711,7 @@ def slow_poisson_sampler(mindist, numpoints):
     points = []
     while len(points) < numpoints:
         while True:
-            p = Vec2(random.random(), random.random())
+            p = Vector2(random.random(), random.random())
             bad = False
             for q in points:
                 if vec2_dist(p,q) < mindist:
