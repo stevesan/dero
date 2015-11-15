@@ -22,6 +22,10 @@ def add2(a,b):
 def unordered_equal(t0, t1):
     return (t0[0] == t1[0] and t0[1] == t1[1]) or (t0[0] == t1[1] and t0[1] == t1[0])
 
+def clamp_magnitude(x, maxmag):
+    assert maxmag >= 0
+    return min( maxmag, max(x, -maxmag))
+
 class IntMatrix2:
     def __init__(self, elems):
         """ elems should be row-major list of elements, ie. (e_00, e_01, e_10, e_11) """
@@ -176,6 +180,13 @@ class Int2:
         d /= len(vs)
         return d
 
+    def write_ascii(u, st):
+        st.write('%d\n%d\n' % (u.x, u.y))
+
+    def read_ascii(u, st):
+        u.x = int(st.readline())
+        u.y = int(st.readline())
+
     @staticmethod
     def floor(v2):
         return Int2(
@@ -185,6 +196,16 @@ class Int2:
     @staticmethod
     def manhattan_dist(u, v):
         return abs(v.x - u.x) + abs(v.y - u.y)
+
+    @staticmethod
+    def delta_to_direction(delta):
+        """ biased towards x """
+        n = Int2(0,0)
+        if abs(delta.x) >= abs(delta.y):
+            n = Int2( clamp_magnitude(delta.x, 1), 0 )
+        else:
+            n = Int2( 0, clamp_magnitude(delta.y, 1) )
+        return NORM_TO_EDGE[n]
 
     @staticmethod
     def euclidian_dist(u, v):
@@ -216,6 +237,13 @@ class Int2:
         """ Component-wise max """
         return Int2( max(a.x, b.x), max(a.y, b.y) )
 
+    @staticmethod
+    def iter_filled_circle(center, radius):
+        minn = Int2(center.x-radius, center.y-radius)
+        maxx = Int2(center.x+radius, center.y+radius)
+        for u in Int2.incrange(minn, maxx):
+            if Int2.euclidian_dist(u, center) < radius:
+                yield u
 
 class Grid2:
     def __init__(self,_W, _H, default):
@@ -224,6 +252,12 @@ class Grid2:
         self.grid = range(self.W*self.H)
         for i in range(self.W*self.H):
             self.grid[i] = default
+
+    def __getitem__(G, u):
+        return G.pget(u)
+
+    def __setitem__(G, u, val):
+        G.pset(u, val)
 
     def check(self,p):
         return p.x >= 0 and p.x < self.W and p.y >= 0 and p.y < self.H
@@ -239,6 +273,9 @@ class Grid2:
 
     def pset(self,p,value):
         self.grid[self.W*p.y+p.x] = value
+
+    def debug_print(self):
+        self.printself()
 
     def printself(self):
         # first compute widest string
@@ -345,9 +382,9 @@ class Grid2:
             G.set(x, H-1, val)
 
     def cells_with_values(self, valueset):
-        for (p,x) in self.piter():
-            if x in valueset:
-                yield p
+        for (u,p) in self.piter():
+            if p in valueset:
+                yield u
 
     def cells_with_value(self, value):
         for (p,x) in self.piter():
@@ -544,6 +581,54 @@ class Grid2:
         g = Grid2(other.W, other.H, default_val)
         return g
 
+class GridShape(object):
+
+    def __init__(s, G, value):
+        # compute fronts in all 4 directions
+        s.G = G
+        s.value = value
+        s.dir2front = [[], [], [], []]
+        for (u, p) in G.piter():
+            if p != value:
+                continue
+            for d in range(4):
+                front = s.dir2front[d]
+                v = u + EDGE_TO_NORM[d]
+                if G.pget(v) != value:
+                    front += [u]
+
+        s.centroid = Int2.centroid([u for (u,p) in G.piter() if p == value])
+
+    def check_move(s, dirr, is_free):
+        du = EDGE_TO_NORM[dirr]
+        return all([s.G.check(u+du) and is_free(s.G[u+du]) for u in s.dir2front[dirr]])
+
+    def get_centroid(s):
+        return s.centroid
+
+    def move_towards(s, goal, free_val):
+        dirr = Int2.delta_to_direction( goal - s.get_centroid() )
+        if s.check_move(dirr, lambda x : x == free_val):
+            s.do_move(dirr, free_val)
+            return True
+        else:
+            return False
+
+    def do_move(s, dirr, free_val):
+        du = EDGE_TO_NORM[dirr]
+        # only need to move the front and the opposite front
+        # update all front cells
+        for u in s.dir2front[dirr]:
+            s.G[u+du] = s.value
+
+        for u in s.dir2front[ EDGE_TO_OPPOSITE[dirr] ]:
+            s.G[u] = free_val
+
+        for d in range(4):
+            s.dir2front[d] = [u+du for u in s.dir2front[d]]
+
+        # update centroid
+        s.centroid += du
 
 class Bounds2(object):
 
@@ -576,6 +661,8 @@ EDGE_TO_NORM = [
     Int2(-1, 0),
     Int2(0, -1)
 ]
+
+EDGE_TO_OPPOSITE = [2, 3, 0, 1]
 
 NORM_TO_EDGE = { EDGE_TO_NORM[edge] : edge for edge in range(4) }
 
@@ -1188,7 +1275,81 @@ def compute_convex_mask(G, fillval):
     mask.floodfill( Int2.centroid(hull), False, True )
     return mask
 
+def gather_shapes(G, shapevals, freeval):
+    val2shape = {}
+    val2centroid = {}
+    for val in shapevals:
+        val2shape[val] = GridShape(G, val)
+        val2centroid[val] = Int2.centroid( G.cells_with_values(val) )
+
+    center = Int2(G.W/2, G.H/2)
+    dirs = range(4)
+
+    while True:
+        anymoves = False
+        for (val, shape) in val2shape.iteritems():
+            centroid = val2centroid[val]
+            bestdir = argmin([Int2.manhattan_dist(centroid+EDGE_TO_NORM[dirr], center) for dirr in dirs])
+            if shape.check_move(bestdir):
+                anymoves = True
+                shape.do_move(bestdir, lambda x : x == freeval)
+                val2centroid[val] += EDGE_TO_NORM[bestdir]
+
+        if not anymoves:
+            break
+
+def test_gather_moves():
+    print "test_gather_moves"
+    FREEVAL = ' '
+    G = Grid2(40, 40, FREEVAL)
+    center = Int2(20, 20)
+    shapes = []
+
+    num = 0
+    for c in [Int2(10, 10), Int2(10, 30), Int2(30, 10), Int2(30, 30)]:
+        for u in Int2.iter_filled_circle(c, 5):
+            G[u] = str(num)
+        shape = GridShape(G, str(num))
+        shapes += [shape]
+        num += 1
+
+    while True:
+        G.debug_print()
+        random.shuffle(shapes)
+        movedarr = [s.move_towards(center, FREEVAL) for s in shapes];
+        if not any(movedarr):
+            break
+    G.debug_print()
+
+def test_shape_move():
+    G = Grid2(10, 10, ' ')
+
+    G.set(9, 6, 'O')
+
+    G.set(5, 5, 'X')
+    G.set(6, 5, 'X')
+    G.set(5, 6, 'X')
+    G.set(5, 4, 'X')
+    G.set(4, 5, 'X')
+
+    shape = GridShape(G, 'X')
+
+    dirr = 0
+    G.printself()
+    moves = 0
+    while shape.check_move(dirr, lambda x : x == ' '):
+        shape.do_move(dirr, ' ')
+        G.printself()
+        moves += 1
+
+    assert moves == 3
+
 if __name__ == '__main__':
+
+    test_gather_moves()
+
+    test_shape_move()
+
     with PROFILE("convex hull"):
         # Example: convex hull of a 10-by-10 grid.
         gridpts = [Int2(i//10, i%10) for i in range(100)]
@@ -1200,3 +1361,4 @@ if __name__ == '__main__':
         assert(set(points1) == set(points2))
         assert points1 == [Int2(0, 0), Int2(1, 1), Int2(1, 2), Int2(2, 3), Int2(3, 4)]
         assert points2 == [Int2(3, 4), Int2(2, 3), Int2(1, 2), Int2(1, 1), Int2(0, 0)]
+

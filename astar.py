@@ -2,7 +2,7 @@ from Queue import PriorityQueue
 import itertools
 from heapq import *
 
-class HeapQueue(object):
+class heap(object):
 
     def __init__(s):
         s.reset()
@@ -48,7 +48,7 @@ def astar(start, target, yield_nbors, edge_cost, est_to_target):
     cost_to = {}
     prev = {}
     processed = set()
-    heap = HeapQueue()
+    hq = heap()
 
     u = start
     cost_to[u] = 0
@@ -63,13 +63,13 @@ def astar(start, target, yield_nbors, edge_cost, est_to_target):
                 cost_to[v] = suv
                 prev[v] = u
                 cost_thru = suv + est_to_target(v)
-                heap.add(v, cost_thru)
+                hq.add(v, cost_thru)
         processed.add(u)
 
-        if heap.empty():
+        if hq.empty():
             raise RuntimeError("No path!")
 
-        u = heap.pop()
+        u = hq.pop()
         if u == target:
             # done!
             break
@@ -125,7 +125,7 @@ def test_grid_path():
     print breaks
 
 def test_heap():
-    h = HeapQueue()
+    h = heap()
     h.add( 'b', 2 )
     h.add( 'a', 1 )
     h.add( 'c', 3 )

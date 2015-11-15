@@ -274,7 +274,7 @@ if __name__ == '__main__':
             # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.90, 0.0)
             # min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.98, 0.8)
             # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.95, 0.0)  # best 9/10
-            min_xsym, min_ysym, min_convex, min_boxiness = (random.random(), 1.0, 0.8, 0.0)
+            min_xsym, min_ysym, min_convex, min_boxiness = (random.random(), 1.0, 0.95, 0.0)
         
             print 'constraint parameters:', min_xsym, min_ysym, min_convex
 
