@@ -106,7 +106,10 @@ class Int2:
         return Int2(u.x+v.x, u.y+v.y)
 
     def __sub__(u,v):
-        return Int2(u.x-v.x, u.y-v.y)
+        if type(v) == int:
+            return Int2(u.x-v, u.y-v)
+        else:
+            return Int2(u.x-v.x, u.y-v.y)
 
     def __div__(u, s):
         return Int2(u.x/s, u.y/s)
@@ -591,6 +594,14 @@ class Grid2:
 
         return rv
 
+    def get_bounds(s):
+        return Bounds2(
+                Int2(0,0),
+                Int2(s.W,s.H) -1 )
+
+    def get_center(s):
+        return s.get_bounds().maxs / 2
+
     @staticmethod
     def new_same_size(other, default_val):
         g = Grid2(other.W, other.H, default_val)
@@ -666,6 +677,20 @@ class Bounds2(object):
     def contains(s, u):
         """ inclusive """
         return s.mins.all_lte(u) and u.all_lte(s.maxs)
+
+    def get_size(s):
+        return s.maxs - s.mins + Int2(1,1)
+
+    def get_center(s):
+        return (s.maxs + s.mins) / 2
+
+    def random_inside(s):
+        return Int2(
+                random.randint(s.mins.x, s.maxs.x),
+                random.randint(s.mins.y, s.maxs.y) )
+
+    def shrink(s, corner_deltas):
+        return Bounds2( s.mins + corner_deltas, s.maxs - corner_deltas )
 
     @staticmethod
     def new_inf():

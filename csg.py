@@ -61,6 +61,45 @@ class Reflected(Node):
         p = self.reflect_normal * d.dot(self.reflect_normal)
         return self.node.contains(u - p*2)
 
+
+def random_primitive( center_range, size_range ):
+    assert type(center_range) == Bounds2
+    assert type(center_range) == Bounds2
+
+    center = center_range.random_inside()
+    size = size_range.random_inside()
+
+    if random.random() < 0.5:
+        return Circle( center, (size.x+size.y)/2/2 )
+    else:
+        return Rectangle( Bounds2.from_center_dims(center, size) )
+
+def random_csg_tree(bounds, num_octaves, objs_per_octave):
+    size_range = bounds.get_size()/2
+    tree = None
+    for octave in range(num_octaves):
+        denom = 2**(octave+1)
+        next_denom = 2**(octave+2)
+        size_range = Bounds2( bounds.get_size()/next_denom, bounds.get_size()/denom )
+        center_range = bounds.shrink(size_range.maxs/2)
+        # print "octave %d, size %s, center %s" % (octave, size_range, center_range)
+
+        for _ in range(objs_per_octave):
+            node = random_primitive( center_range, size_range )
+
+            if tree == None:
+                tree = node
+            else:
+                if random.random() < 0.2:
+                    tree = Difference(tree, node)
+                else:
+                    tree = Union(tree, node)
+
+    return tree
+
+def make_vertically_symmetric(tree, center):
+    return Union( tree, Reflected(tree, center, Int2(1,0)))
+
 def test():
     L = 200
     center = Int2(L/2, L/2)
@@ -73,7 +112,18 @@ def test():
 
     G = Grid2(L, L, '.')
     tree.rasterize(G, 'X')
-    G.save_png('cgstest.png')
+    G.save_png('cgstest0.png')
+
+def test1():
+
+    for i in range(30):
+        L = 200
+        G = Grid2(L, L, '.')
+        tree = random_csg_tree( G.get_bounds(), 3, 4 )
+        tree = make_vertically_symmetric( tree, G.get_center() )
+        tree.rasterize(G, 'X')
+        G.save_png('rand_csg_tree_%d.png' % i)
 
 if __name__ == '__main__':
     test()
+    test1()
