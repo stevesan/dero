@@ -268,7 +268,8 @@ def create_shape(width, height):
     # min_xsym, min_ysym, min_convex, min_boxiness = (0, 1, 1.0, 0.0)
     # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.90, 0.0)
     # min_xsym, min_ysym, min_convex, min_boxiness = (0.7, 1, 0.98, 0.8)
-    min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.95, 0.0)  # best 9/10
+    # min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.95, 0.0)  # best 9/10
+    min_xsym, min_ysym, min_convex, min_boxiness = (0.5, 1, 0.5, 0.0)  # best 9/10
     # min_xsym, min_ysym, min_convex, min_boxiness = (random.random(), 1.0, 0.95, 0.0)
 
     width = ceilodd(width)

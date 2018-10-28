@@ -587,6 +587,9 @@ def test_doom1_wad():
     assert content.end_msg
     _map = content.maps[0]
 
+    for i in range(len(content.maps)):
+        save_map_png(content.maps[i], 'doom1-map-' + str(i) + '.png')
+
     # create square map
     m3 = create_square_map(_map)
     lumps = []
