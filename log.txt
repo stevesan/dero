@@ -193,14 +193,17 @@ then what functions can a room and its design serve? let's see:
   - present 1 or more exits to other rooms. this is the most basic, universal function.
       this gets more interesting when rooms are different, such as height change (stairs, ramps), type change (indoor to outdoor), theme change (tech to hell), etc.
   - present a view. ex: e1m1 pool room, west room.
-  - present a combat scenario. the imp-lava space, the box-of-demons space
-  - present loot
-  - show off tech
-  - show off art
+      vision is very important in level design. horse-shoe. "see that mountain? you can go there"
+  - house a combat scenario. the imp-lava space, the box-of-demons space
+  - present loot. act as a pedestal.
+  - show off tech, art
+      stairs to show DOOM's height tech
   - induce emotion (e.g. scare the player) 
+  - fit within a prescribed space. "i need a tunnel from A to B, but there's not much space left between all my existing rooms.."
+        
 
 if you can design a room with 1 "set piece" that covers all its functions, that is THE BEST. this is not strictly necessary, of course. the box only serves to present the grunts, the pool only presents the view. the lava bridge is a good example of multi-function: 1) tricky combat scenario with imps throwing fireballs at you while you try to not fall into lava, and 2) connecting the entrance to the exit. the west room stair case also does: 1) presents the view, 2) holds the armor loot, 3) shows off verticality.
 
 given all this, just generating shapes is not that interesting. and this is probably a well-studied problem. instead, we need to generate with function in mind..
-	- generate a tunnel from A to B. we did this with that jsfiddle! it was one of the more successful mini-experiments.
-	- generate e1m1 west room: elevation change with a view, a "pedestal", and some combat interest (the pillars).
+  - generate a tunnel from A to B. we did this with that jsfiddle! it was one of the more successful mini-experiments.
+  - generate e1m1 west room: elevation change with a view, a "pedestal", and some combat interest (the pillars).
