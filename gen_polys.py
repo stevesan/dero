@@ -7,10 +7,14 @@ from dataclasses import dataclass
 
 @dataclass
 class PolyGenArgs(object):
-  # How symmetric? [0, 1]
   symmetry: float = 1.0
   num_lines: int = 6
   size: tuple[int, int] = (100, 100)
+  # 0 means no concavity
+  concavity: float = 1.0
+  # 1.0 means all sides will be the same length and all angles will be equal.
+  regularity: float = 0.5
+
 
 def gen_poly(args):
   """Returns a list of points meant to define a closed polygon"""
@@ -47,7 +51,7 @@ def main():
   yofs = 0
   for poly in polys:
     pts = [(p[0]+xofs, p[1]+yofs) for p in poly]
-    pygame.draw.polygon(screen, line_color, pts, 1)
+    pygame.draw.polygon(screen, line_color, pts, 0)
     xofs += L
 
     if xofs >= width:
