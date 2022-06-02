@@ -171,3 +171,36 @@ zone shapes:
     we could combine our shape gen with spreading... first gen shapes, then shove them together, then choose half the shapes to 'spread' some amount.
     this results in 'tight packing' while the ones that aren't spread get some non-symmetry and non-convexity that isn't totally random either (cuz they're shaped by their context)
     this 'fill spread' can be symmetric too
+
+---------
+20222
+---------
+
+generating polygons is cool, but they should not necessarily be generated in isolation and then just slapped together in a later pass. there are clearly features of rooms that result from adjacency. for example, in the left end of e1m1, the indent into the bigger space is clearly because of the stair-room going into it.
+
+is this approach of "minimap first" design not the right approach, then? clearly, a lot of the shapes are BECAUSE of design considerations.
+
+maybe it'd be better to mirror the design process a human would go through rather than trying to create the generator from the mini-map perspective. afterall, these subtle decisions were made after playtesting. maybe i should first design e1m1 myself? what process would a designer go through? probably you think a lot of what the player sees, etc.
+
+maybe we should start with a set of overlapping boxes..like a designer may start with a grey boxed layout..
+i'm sure different levels were built with different processes. there's no "best way" to write a song, for example. so let's just choose one and see where we end up.
+
+INSIGHT: spaces are awesome when you perceive their form AND FUNCTION. a form without function is a sculpture. they're useful, but most cool DOOM rooms are not just a room with a sculpture. for example, the E1M1 west room is a stair case LEADING UP to the view. the imp room is meant to intro the imps and has a tight-rope mechanic. the E1M1 intro pool highlights the view again. the next room has a box in the middle that highlights the two grunts.
+
+so when generating a room, we should make sure the form is tighlty coupled with its function. if the E1M1 west room just had a stair case in the middle, that'd be lame. it'd be easy to "see the algorithm". "oh, they're just placing completely random shit in the middle of rooms." the key phrase here is "completely random". it implies "no purpose." no function.
+
+then what functions can a room and its design serve? let's see:
+  - present 1 or more exits to other rooms. this is the most basic, universal function.
+      this gets more interesting when rooms are different, such as height change (stairs, ramps), type change (indoor to outdoor), theme change (tech to hell), etc.
+  - present a view. ex: e1m1 pool room, west room.
+  - present a combat scenario. the imp-lava space, the box-of-demons space
+  - present loot
+  - show off tech
+  - show off art
+  - induce emotion (e.g. scare the player) 
+
+if you can design a room with 1 "set piece" that covers all its functions, that is THE BEST. this is not strictly necessary, of course. the box only serves to present the grunts, the pool only presents the view. the lava bridge is a good example of multi-function: 1) tricky combat scenario with imps throwing fireballs at you while you try to not fall into lava, and 2) connecting the entrance to the exit. the west room stair case also does: 1) presents the view, 2) holds the armor loot, 3) shows off verticality.
+
+given all this, just generating shapes is not that interesting. and this is probably a well-studied problem. instead, we need to generate with function in mind..
+	- generate a tunnel from A to B. we did this with that jsfiddle! it was one of the more successful mini-experiments.
+	- generate e1m1 west room: elevation change with a view, a "pedestal", and some combat interest (the pillars).
