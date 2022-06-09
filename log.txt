@@ -255,3 +255,6 @@ possible shape gen algo, inspired by stealth game:
   space-union: union spaces, but all walls removed
   intersect: do nothing - walls stay
 
+- what about an algo that is able to create a regions and relations that satisfy a beat graph? ie. adjacent regions are touching, visible relationships are respected, etc.
+
+visibility of goals is very important. seeing a door is one thing. seeing a door that might take you to that shiny treasure is much better.
