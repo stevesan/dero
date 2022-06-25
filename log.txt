@@ -258,3 +258,13 @@ possible shape gen algo, inspired by stealth game:
 - what about an algo that is able to create a regions and relations that satisfy a beat graph? ie. adjacent regions are touching, visible relationships are respected, etc.
 
 visibility of goals is very important. seeing a door is one thing. seeing a door that might take you to that shiny treasure is much better.
+
+- very hand-crafted generators for connectors..that connect spaces..generate stairs, elevators, tunnels, etc.
+
+how to get a model that will generate room-inside-rooms? our model may yield more interesting results if it did this..
+-----
+
+
+THINK ABOUT: creating an *exploratory* design tool. where the designer is presented with many generated choices at various stages of the design process, but is still very much directing and guiding the generation process. overall goal is to take existing design aesthetics and make it easier to create more levels, ie. doom e1m* maps. take inspiration from "many worlds browsing" physics.
+
+designers are good at certain things and enjoy certain things. such as, designing set pieces, puzzles, figuring out flows/layouts, combat scenarios, theming, etc. less desirable would be dealing with verts, large edits, etc.
