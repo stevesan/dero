@@ -591,7 +591,7 @@ def save_map_png_partial(mapp, fname, linechance):
     print('done plotting to %s' % fname)
     pylab.close()
 
-def test_doom1_wad():
+def test_dump_doom1_pngs():
     path = dero_config.DOOM1_WAD_PATH
     content = load(path)
 
@@ -601,6 +601,14 @@ def test_doom1_wad():
 
     for i in range(len(content.maps)):
         save_map_png(content.maps[i], 'doom1-map-' + str(i) + '.png')
+
+def test_doom1_wad():
+    path = dero_config.DOOM1_WAD_PATH
+    content = load(path)
+
+    assert len(content.maps) == 36
+    assert content.end_msg
+    _map = content.maps[0]
 
     # create square map
     m3 = create_square_map(_map)
@@ -712,3 +720,4 @@ def create_square_map(ref):
 
 if __name__ == "__main__":
     test_doom1_wad()
+    # test_dump_doom1_pngs()
