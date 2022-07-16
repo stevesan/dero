@@ -1,0 +1,7 @@
+
+use python3
+
+pip packages:
+- matplotlib
+- noise
+- euclid

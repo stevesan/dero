@@ -4,10 +4,9 @@ import math
 import pylab
 import random
 import noise
-from Queue import *
+from queue import *
 import sys
 from euclid import *
-import wad
 
 def char_times(c, x):
     rv = ''
@@ -93,6 +92,14 @@ class Int2:
     def all_gte(self, other):
         return self.x >= other.x and self.y >= other.y
 
+    def __lt__(self, other):
+      """ Lexographic compare """
+      return (self.x, self.y) < (other.x, other.y)
+
+    def __gt__(self, other):
+      """ Lexographic compare """
+      return (self.x, self.y) > (other.x, other.y)
+
     def __hash__(self):
         return hash((self.x,self.y))
 
@@ -111,7 +118,7 @@ class Int2:
         else:
             return Int2(u.x-v.x, u.y-v.y)
 
-    def __div__(u, s):
+    def __truediv__(u, s):
         return Int2(u.x/s, u.y/s)
 
     def __mul__(u, s):
@@ -261,7 +268,7 @@ class Grid2:
     def __init__(self,_W, _H, default):
         self.W = _W
         self.H = _H
-        self.grid = range(self.W*self.H)
+        self.grid = list(range(self.W*self.H))
         for i in range(self.W*self.H):
             self.grid[i] = default
 
@@ -301,7 +308,7 @@ class Grid2:
         for (u,x) in self.piter():
             maxlen = max( len(str(x)), maxlen )
 
-        yy = range(self.H)
+        yy = list(range(self.H))
         yy.reverse()
         for y in yy:
             rowstr = ''
@@ -309,7 +316,7 @@ class Grid2:
                 val = self.get(x,y)
                 rowstr += char_times(' ', maxlen-len(str(val))+1)
                 rowstr += str(val)
-            print rowstr
+            print(rowstr)
 
     def unique_values(self):
         vals = set()
@@ -839,7 +846,7 @@ def seed_spread(seedvals, sews, G, freevalue, max_spreads):
             break
         for val in seedvals:
             if len(freespots) == 0:
-                print 'WARNING: Ran out of free spots before seed sewing'
+                print('WARNING: Ran out of free spots before seed sewing')
                 break
             u = freespots.pop()
             # make sure this keeps regions separate
@@ -858,7 +865,7 @@ def seed_spread(seedvals, sews, G, freevalue, max_spreads):
     while front.size() > 0 and spreads < max_spreads:
         spreads += 1
         if spreads % 100 == 0:
-            print '%d/%d' % (spreads, max_spreads)
+            print('%d/%d' % (spreads, max_spreads))
         # spread
         u = front.sample()
 
@@ -1014,14 +1021,14 @@ def polygonate(G, is_in_val, oob_is_inside, on_edge):
         while True:
             dones = edge_done_grid.pget(u)
             if (dones & (1 << edge)) > 0:
-                print 'done'
+                print('done')
                 break
 
             # the last one in the chain will take of our left-vert, so don't worry about it
             poly += [ right_vert(u, edge) ]
             if on_edge: on_edge(u, u+EDGE_TO_NORM[edge], poly_id, len(poly)-2)
-# print u, edge
-# print poly
+# print(u, edge)
+# print(poly)
             new_done = dones | (1<<edge)
             edge_done_grid.pset(u, new_done)
 
@@ -1298,11 +1305,11 @@ class PROFILE:
     def __enter__(s):
         PROFILE.LEVEL += 1
         s.t0 = timeit.default_timer()
-        # print '%sBEGIN %s' % (' '*PROFILE.LEVEL, s.label)
+        # print('%sBEGIN %s' % (' '*PROFILE.LEVEL, s.label))
 
     def __exit__(s, type, value, traceback):
         t1 = timeit.default_timer()
-        print '%sEND %s - took %f s' % (' '*PROFILE.LEVEL, s.label, t1-s.t0)
+        print('%sEND %s - took %f s' % (' '*PROFILE.LEVEL, s.label, t1-s.t0))
         PROFILE.LEVEL -= 1
 
 def compute_convex_mask(G, fillval):
@@ -1345,7 +1352,7 @@ def gather_shapes(G, shapevals, freeval):
             break
 
 def test_gather_moves():
-    print "test_gather_moves"
+    print("test_gather_moves")
     FREEVAL = ' '
     G = Grid2(40, 40, FREEVAL)
     center = Int2(20, 20)
