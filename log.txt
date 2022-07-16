@@ -268,3 +268,5 @@ how to get a model that will generate room-inside-rooms? our model may yield mor
 THINK ABOUT: creating an *exploratory* design tool. where the designer is presented with many generated choices at various stages of the design process, but is still very much directing and guiding the generation process. overall goal is to take existing design aesthetics and make it easier to create more levels, ie. doom e1m* maps. take inspiration from "many worlds browsing" physics.
 
 designers are good at certain things and enjoy certain things. such as, designing set pieces, puzzles, figuring out flows/layouts, combat scenarios, theming, etc. less desirable would be dealing with verts, large edits, etc.
+
+TODO think about..generating paths through a grid. just random paths. just the act of navigating a space in an interesting way is cool! like looping back to a previous location, going over a bridge you saw before, etc. etc. so, can we generate meaningful paths? imagine tuning like "amount of backtracking" or "linearity" or "amount of revisiting". not just lock/key graphs.
