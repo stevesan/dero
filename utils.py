@@ -1343,7 +1343,7 @@ def gather_shapes(G, shapevals, freeval):
 
     while True:
         anymoves = False
-        for (val, shape) in val2shape.iteritems():
+        for (val, shape) in val2shape.items():
             centroid = val2centroid[val]
             bestdir = argmin([Int2.manhattan_dist(centroid+EDGE_TO_NORM[dirr], center) for dirr in dirs])
             if shape.check_move(bestdir):

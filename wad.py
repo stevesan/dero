@@ -51,7 +51,7 @@ class WADFile:
     def write_string8(s, val):
         final = val
         while len(final) < 8: final += '\0'
-        s.f.write(final)
+        s.f.write(final.encode('ascii'))
 
     def read_array_lump(s, lumpend, clazz):
         try:
@@ -394,7 +394,7 @@ class Map:
                 color2lds[color] = []
             color2lds[color].append(ld)
 
-        for (color, lds) in color2lds.iteritems():
+        for (color, lds) in color2lds.items():
             xx = []
             yy = []
             nan = float('nan')
@@ -547,7 +547,7 @@ def save(path, header, lumps):
     with open(path, 'wb') as fout:
         """ Writes an array of lumps to a *single* WAD file, handling proper directory setup, etc. """
         io = WADFile(fout)
-        fout.write('PWAD')
+        fout.write('PWAD'.encode('ascii'))
         io.write_long( len(lumps) )
 
         # dir offset
@@ -642,7 +642,7 @@ def create_square_map(ref):
 
     L = 200
     rv = Map('E1M1')
-    rv.add_player_start(L/2,L/2,0)
+    rv.add_player_start(L//2,L//2,0)
     rv.verts = [
         Vertex().fill([0,0]),
         Vertex().fill([0,L]),
