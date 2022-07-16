@@ -58,6 +58,8 @@ class Int2:
     y = 0
 
     def __init__(self, _x, _y):
+        assert isinstance(_x, int)
+        assert isinstance(_y, int)
         self.x = _x
         self.y = _y
 
