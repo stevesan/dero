@@ -1,4 +1,4 @@
-from Queue import PriorityQueue
+from queue import PriorityQueue
 import itertools
 from heapq import *
 
@@ -111,7 +111,7 @@ def test_grid_path():
         return Int2.euclidian_dist(u, target)
 
     G.printself()
-    print '---'
+    print('---')
 
     breaks = 0
     for u in astar( start, target, yield_nbors, edge_cost, est_to_target ):
@@ -122,7 +122,7 @@ def test_grid_path():
             G.pset(u, '.')
 
     G.printself()
-    print breaks
+    print(breaks)
 
 def test_heap():
     h = heap()
