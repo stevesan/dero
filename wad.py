@@ -379,7 +379,7 @@ class Map:
     def plot(s):
         return s.plot(1.0)
 
-    def plot_partial(s, linechance):
+    def plot_partial(s, height_over_width, linechance):
         linewidth = 1.0
 
         print('plotting %d things, %d lines' % (len(s.things), len(s.linedefs)))
@@ -414,9 +414,8 @@ class Map:
         L = max(dx, dy) * 1.1
         cx = (max(xx)+min(xx))/2.0
         cy = (max(yy)+min(yy))/2.0
-        aspect_ratio = 4.0/5.0
-        left = cx - L/2.0/aspect_ratio
-        right = cx + L/2.0/aspect_ratio
+        left = cx - L/2.0/height_over_width
+        right = cx + L/2.0/height_over_width
         top = cy + L/2.0
         bot = cy - L/2.0
         pylab.xlim([ left, right ])
@@ -586,8 +585,10 @@ def save_map_png(mapp, fname):
     return save_map_png_partial( mapp, fname, 1.0 )
 
 def save_map_png_partial(mapp, fname, linechance):
-    pylab.figure(figsize=(8,8))
-    mapp.plot_partial(linechance)
+    w_inches = 10
+    h_inches = 8
+    pylab.figure(figsize=(w_inches, h_inches))
+    mapp.plot_partial(h_inches/w_inches, linechance)
     pylab.savefig(fname, dpi=512)
     print('done plotting to %s' % fname)
     pylab.close()
