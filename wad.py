@@ -1,7 +1,7 @@
 import sys
 import struct
 import pylab
-from Queue import * 
+from queue import * 
 import random
 import utils
 import dero_config
@@ -39,12 +39,14 @@ class WADFile:
         return s.f.write( struct.pack('h', val) )
 
     def read_string8(s):
-        raw = s.f.read(8)
-        term = raw.find('\0')
+        rawbytes = s.f.read(8)
+        # Find the terminator first, otherwise decoding may fail for chars
+        # after the term
+        term = rawbytes.find(0)
         if term == -1:
-            return raw
+            return rawbytes.decode('ascii')
         else:
-            return raw[0:term]
+            return rawbytes[0:term].decode('ascii')
 
     def write_string8(s, val):
         final = val
@@ -52,14 +54,18 @@ class WADFile:
         s.f.write(final)
 
     def read_array_lump(s, lumpend, clazz):
-        size = clazz().get_size()
-        assert (lumpend - s.f.tell()) % size == 0
-        rv = []
-        while s.f.tell() < lumpend:
-            block = clazz()
-            block.read(s)
-            rv += [block]
-        return rv
+        try:
+            size = clazz().get_size()
+            assert (lumpend - s.f.tell()) % size == 0
+            rv = []
+            while s.f.tell() < lumpend:
+                block = clazz()
+                block.read(s)
+                rv += [block]
+            return rv
+        except Exception as e:
+            print(f'During read_array_lump of class {clazz.__class__.__name__}')
+            raise e
 
     def write_array_lump(s, array):
         for block in array:
@@ -73,12 +79,18 @@ class SimpleStruct:
 
     def read(s,io):
         for field in s.get_fields():
-            if field[1] == 'short':
-                setattr(s, field[0], io.read_short())
-            elif field[1] == 'int':
-                setattr(s, field[0], io.read_long())
-            elif field[1] == 'string8':
-                setattr(s, field[0], io.read_string8())
+            try:
+                if field[1] == 'short':
+                    setattr(s, field[0], io.read_short())
+                elif field[1] == 'int':
+                    setattr(s, field[0], io.read_long())
+                elif field[1] == 'string8':
+                    # print(f'Reading str8 field {field[0]}')
+                    setattr(s, field[0], io.read_string8())
+                    # print(f'  read value: "{getattr(s, field[0])}"')
+            except Exception as e:
+                print(f'While reading field {field[0]} of struct {s.__class__.__name__}')
+                raise e
 
     def write(s,io):
         for field in s.get_fields():
@@ -514,11 +526,11 @@ def load(path):
     with open(path, 'rb') as f:
         wad = WADFile(f)
 
-        header = f.read(4)
+        header = f.read(4).decode('ascii')
         num_lumps = wad.read_long()
         dir_offset = wad.read_long()
 
-        assert header == 'IWAD' or header == 'PWAD'
+        assert header == 'IWAD' or header == 'PWAD', header
 
         # read directory
         f.seek(dir_offset)
