@@ -1,11 +1,13 @@
+import argparse
+import os
 import wad
-import dero_config
 
-def dump_all_maps(wadp):
-    content = wad.load(wadp)
-    for m in content.maps:
-        wad.save_map_png(m, m.name + '.png')
+parser = argparse.ArgumentParser()
+parser.add_argument('wad', type=str, help='Path to the WAD to dump')
+parser.add_argument('outdir', type=str, help='Directory to dump map PNGs to')
+args = parser.parse_args()
 
-
-dump_all_maps(dero_config.DOOM1_WAD_PATH)
-dump_all_maps(dero_config.DOOM2_WAD_PATH)
+os.makedirs(args.outdir, exist_ok=True)
+content = wad.load(args.wad)
+for mapp in content.maps:
+    wad.save_map_png(mapp, os.path.join(args.outdir, mapp.name + '.png'))

@@ -380,6 +380,7 @@ class Map:
         return s.plot(1.0)
 
     def plot_partial(s, linechance):
+        linewidth = 1.0
 
         print('plotting %d things, %d lines' % (len(s.things), len(s.linedefs)))
         for t in s.things:
@@ -403,7 +404,7 @@ class Map:
                 p1 = s.verts[ld.vert1]
                 xx += [p0.x, p1.x, nan]
                 yy += [p0.y, p1.y, nan]
-            pylab.plot( xx, yy, '-', color=color )
+            pylab.plot( xx, yy, '-', color=color, linewidth=0.5)
 
         # make it square
         xx = [v.x for v in s.verts]
@@ -585,9 +586,9 @@ def save_map_png(mapp, fname):
     return save_map_png_partial( mapp, fname, 1.0 )
 
 def save_map_png_partial(mapp, fname, linechance):
-    pylab.figure()
+    pylab.figure(figsize=(8,8))
     mapp.plot_partial(linechance)
-    pylab.savefig(fname, size=(5,5))
+    pylab.savefig(fname, dpi=512)
     print('done plotting to %s' % fname)
     pylab.close()
 
