@@ -298,13 +298,13 @@ def get_color_for_thing(thing_type):
         return 'g'
     if 'key' in type_desc:
         if 'blue' in type_desc:
-            print type_desc
+            print(type_desc)
             return 'b'
         elif 'red' in type_desc:
-            print type_desc
+            print(type_desc)
             return 'r'
         elif 'yellow' in type_desc:
-            print type_desc
+            print(type_desc)
             return 'y'
     else:
         return None
@@ -369,7 +369,7 @@ class Map:
 
     def plot_partial(s, linechance):
 
-        print 'plotting %d things, %d lines' % (len(s.things), len(s.linedefs))
+        print('plotting %d things, %d lines' % (len(s.things), len(s.linedefs)))
         for t in s.things:
             color = get_color_for_thing(t.type)
             if color:
@@ -409,7 +409,7 @@ class Map:
         pylab.xlim([ left, right ])
         pylab.ylim([ bot, top ])
 
-        print 'done'
+        print('done')
 
     def unique_textures(s):
         uniqs = set()
@@ -458,13 +458,13 @@ class Map:
         s.things += [t]
 
     def sanity_asserts(s):
-        print 'checking %d verts for dupes' % len(s.verts)
+        print('checking %d verts for dupes' % len(s.verts))
         uniqverts = set()
         for v in s.verts:
             v2 = utils.Int2(v.x, v.y)
             uniqverts.add(v2)
         assert( len(uniqverts) == len(s.verts) )
-        print 'done'
+        print('done')
 
 # check linedefs
         for ld in s.linedefs:
@@ -492,7 +492,7 @@ class WADContent:
 
             if wad.is_map_start_lump(name):
                 assert entry.size == 0
-                print 'reading map ' + entry.name
+                print('reading map ' + entry.name)
                 mapp = Map(entry.name)
                 s.maps += [mapp]
 
@@ -547,10 +547,10 @@ def save(path, header, lumps):
         lumpstart = 4 + 4 + 4
         directory = []
 
-        print 'dir off set = %d' % dir_offset
+        print('dir off set = %d' % dir_offset)
 
         for lump in lumps:
-            # print 'start = %d, tell = %d' % (lumpstart, fout.tell())
+            # print('start = %d, tell = %d' % (lumpstart, fout.tell()))
             assert lumpstart == fout.tell()
             lump.write(io)
 
@@ -562,7 +562,7 @@ def save(path, header, lumps):
             entry.filepos = lumpstart
 
             directory += [entry]
-            print '%d += %d' % (lumpstart, entry.size)
+            print('%d += %d' % (lumpstart, entry.size))
             lumpstart += entry.size
 
         assert lumpstart == dir_offset
@@ -576,7 +576,7 @@ def save_map_png_partial(mapp, fname, linechance):
     pylab.figure()
     mapp.plot_partial(linechance)
     pylab.savefig(fname, size=(5,5))
-    print 'done plotting to %s' % fname
+    print('done plotting to %s' % fname)
     pylab.close()
 
 def test_doom1_wad():
@@ -602,7 +602,7 @@ def test_doom1_wad():
 
     # print out all unique LD functions
     funcs = set([ ld.function for ld in _map.linedefs] )
-    print 'unique functions: ' + str(funcs)
+    print('unique functions: ' + str(funcs))
 
     # write the map back
     lumps = []
@@ -655,13 +655,13 @@ def create_square_map(ref):
 
     exit_lds = [ld for ld in ref.linedefs if ld.function == 11]
     exit_sd = ref.sidedefs[ exit_lds[0].sd_right ]
-    print 'exit ld = ', exit_lds[0]
-    print 'exit sd = ', exit_sd
+    print('exit ld = ', exit_lds[0])
+    print('exit sd = ', exit_sd)
 
     refsd = random.choice([sd for sd in ref.sidedefs if sd.has_all_textures()])
     refsd2 = random.choice([sd for sd in ref.sidedefs if sd.has_all_textures()])
-    print 'refsd', refsd
-    print 'refsd2', refsd2
+    print('refsd', refsd)
+    print('refsd2', refsd2)
 
     rv.sidedefs = [
         SideDef().fill([0, 0,   refsd.uppertex, refsd.lowertex, refsd.midtex, 0]), # 0
@@ -692,8 +692,8 @@ def create_square_map(ref):
         LineDef().fill([5, 2,   0, 0, 0,    7, -1]).set_flag('Impassible').set_flag('Lower Unpegged'),
         ]
 
-    print 'FOO'
-    print str(exit_sd)
+    print('FOO')
+    print(str(exit_sd))
 
 
     return rv
