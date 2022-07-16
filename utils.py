@@ -120,8 +120,9 @@ class Int2:
         else:
             return Int2(u.x-v.x, u.y-v.y)
 
-    def __truediv__(u, s):
-        return Int2(u.x/s, u.y/s)
+    def __floordiv__(u, s):
+        assert isinstance(s, int)
+        return Int2(u.x//s, u.y//s)
 
     def __mul__(u, s):
         return Int2(u.x*s, u.y*s)
@@ -239,7 +240,7 @@ class Int2:
         summ = Int2(0,0)
         for c in coords:
             summ = summ + c
-        return summ / len(coords)
+        return summ // len(coords)
 
     @staticmethod
     def incrange(a, b):
@@ -596,10 +597,13 @@ class Grid2:
             yield Int2(x, 0)
 
     def bbox(s, select):
-        rv = Bounds2.new_inf()
+        rv = None
         for (u, p) in s.piter():
             if select(p):
-                rv = rv.including(u)
+                if rv is None:
+                    rv = Bounds2(u, u)
+                else:
+                    rv = rv.including(u)
 
         return rv
 
@@ -609,7 +613,7 @@ class Grid2:
                 Int2(s.W,s.H) -1 )
 
     def get_center(s):
-        return s.get_bounds().maxs / 2
+        return s.get_bounds().maxs // 2
 
     @staticmethod
     def new_same_size(other, default_val):
@@ -671,6 +675,8 @@ class GridShape(object):
 class Bounds2(object):
 
     def __init__(s, mins, maxs):
+        assert isinstance(mins, Int2)
+        assert isinstance(maxs, Int2)
         s.mins = mins
         s.maxs = maxs
 
@@ -691,7 +697,7 @@ class Bounds2(object):
         return s.maxs - s.mins + Int2(1,1)
 
     def get_center(s):
-        return (s.maxs + s.mins) / 2
+        return (s.maxs + s.mins) // 2
 
     def random_inside(s):
         return Int2(
@@ -702,13 +708,8 @@ class Bounds2(object):
         return Bounds2( s.mins + corner_deltas, s.maxs - corner_deltas )
 
     @staticmethod
-    def new_inf():
-        inf = float('inf')
-        return Bounds2( Int2(inf, inf), Int2(inf, inf) * -1 )
-
-    @staticmethod
     def from_center_dims(center, dims):
-        return Bounds2( center-dims/2, center+dims/2 )
+        return Bounds2( center-dims//2, center+dims//2 )
 
 EDGE_TO_NORM = [
     Int2(1, 0),

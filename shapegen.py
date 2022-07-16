@@ -4,8 +4,8 @@ FREE = '.'
 FILL = 'X'
 
 def compute_symmetry( G, axis ):
-    center = Int2(G.W/2, G.H/2)
-    H = Int2(G.W/2, G.H/2)
+    center = Int2(G.W//2, G.H//2)
+    H = Int2(G.W//2, G.H//2)
     perp = axis.turn(1)
     def reflect(u):
         perpcoord = (u-center).dot(perp)
@@ -38,7 +38,7 @@ def compute_convexity( G ):
     # H.printself()
     # save_grid_png(H, 'hull.png')
 
-    print 'compute_convexity: 1.0 - %d / %d' % (cavityarea, hullarea)
+    print('compute_convexity: 1.0 - %d / %d' % (cavityarea, hullarea))
 
     return convexity
 
@@ -63,7 +63,7 @@ def enforce_symmetry(G, min_symmetry, axis, force_contiguous):
     assert G.W % 2 == 1
     assert G.H % 2 == 1
 
-    center = Int2(G.W/2, G.H/2)
+    center = Int2(G.W//2, G.H//2)
 
     perp = axis.turn(1)
 
@@ -95,7 +95,7 @@ def enforce_symmetry(G, min_symmetry, axis, force_contiguous):
 
         if len(eligible) == 0:
             G.printself()
-            print 'UH OH could not find any eligible points to increase symmetry'
+            print('UH OH could not find any eligible points to increase symmetry')
 
         lucky = random.choice(eligible)
         singles.remove(lucky)
@@ -188,12 +188,12 @@ def enforce_boxiness(G, min_boxiness):
 def test_symmetry():
     L = 41
     G = Grid2(L,L,FREE)
-    cent = Int2(L/2, L/2)
+    cent = Int2(L//2, L//2)
     G.pset(cent, FILL)
-    seed_spread([FILL], 0, G, FREE, L*L/3)
+    seed_spread([FILL], 0, G, FREE, L*L//3)
 
     for (u,p) in G.piter():
-        if u.y <= L/2:
+        if u.y <= L//2:
             G.pset(u, FREE)
 
     assert compute_symmetry(G, Int2(1,0)) == 0.0
@@ -204,14 +204,14 @@ def test_y_symmetry():
     for (u, p) in G.piter():
         if random.random() < 0.2:
             G.pset(u, FILL)
-    center = Int2(L/2, L/2)
+    center = Int2(L//2, L//2)
     axis = Int2(0,1)
     G.printself()
-    print compute_symmetry(G, axis)
+    print(compute_symmetry(G, axis))
 
     enforce_symmetry( G, 1.0, axis, False )
     G.printself()
-    print compute_symmetry(G, axis)
+    print(compute_symmetry(G, axis))
 
 def fixed_point_iterate(steps, max_steps):
     assert type(steps) == list
@@ -276,17 +276,17 @@ def create_shape(width, height):
     height = ceilodd(height)
 
     G = Grid2(width,height,FREE)
-    cent = Int2(width/2, height/2)
+    cent = Int2(width//2, height//2)
     G.pset(cent, FILL)
     # initial random spread step
     with PROFILE('spread'):
         seed_spread([FILL], 0, G, FREE, width*height/4)
 
     def print_status():
-        print 'xsym %f \t ysym %f \t convex %f' % (
+        print('xsym %f \t ysym %f \t convex %f' % (
                 compute_symmetry( G, Int2(1,0) ),
                 compute_symmetry( G, Int2(0,1) ),
-                compute_convexity( G ))
+                compute_convexity( G )))
         return False
 
     fixed_point_iterate([
@@ -313,7 +313,7 @@ def create_clump_of_shapes(width, height, shape_rows, shape_cols):
     shape_id = 0
     for shape_coord in shape_dims.range():
         shape_ofs = shape_coord.scale(Int2(sw, sh)*F)
-        print 'shape %s %s' % (shape_coord, shape_ofs)
+        print('shape %s %s' % (shape_coord, shape_ofs))
         shape_grid = create_shape(sw, sh)
         for (u, p) in shape_grid.piter():
             if p == FILL:
