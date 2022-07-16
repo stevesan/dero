@@ -597,7 +597,6 @@ def test_dump_doom1_pngs():
 
     assert len(content.maps) == 36
     assert content.end_msg
-    _map = content.maps[0]
 
     for i in range(len(content.maps)):
         save_map_png(content.maps[i], 'doom1-map-' + str(i) + '.png')
@@ -608,42 +607,46 @@ def test_doom1_wad():
 
     assert len(content.maps) == 36
     assert content.end_msg
-    _map = content.maps[0]
+    e1m1 = content.maps[0]
 
     # create square map
-    m3 = create_square_map(_map)
+    m3 = create_square_map(e1m1)
     lumps = []
     m3.append_lumps_to(lumps)
     save('square.wad', 'PWAD', lumps)
     dero_config.build_wad( 'square.wad', 'square-built.wad' )
 
     # filter out all things except player start
-    _map.things = [t for t in _map.things if t.type == 1]
+    e1m1.things = [t for t in e1m1.things if t.type == 1]
+
+    # make all floors use FLAT5_3
+    for s in e1m1.sectors:
+        s.floor_pic = 'FLAT5_3'
 
     # print out all unique LD functions
-    funcs = set([ ld.function for ld in _map.linedefs] )
+    funcs = set([ ld.function for ld in e1m1.linedefs] )
     print('unique functions: ' + str(funcs))
 
     # write the map back
     lumps = []
-    _map.append_lumps_to(lumps)
-    save('%s.wad' % _map.name, 'PWAD', lumps)
+    e1m1.append_lumps_to(lumps)
+    save('%s.wad' % e1m1.name, 'PWAD', lumps)
 
     # run bsp on it
-    dero_config.build_wad( '%s.wad' % _map.name, 'test.wad' )
+    dero_config.build_wad( '%s.wad' % e1m1.name, f'{e1m1.name}-built.wad' )
 
     # read it back
-    cont2 = load('%s.wad' % _map.name)
+    cont2 = load('%s.wad' % e1m1.name)
     assert len(cont2.maps) == 1
     assert cont2.end_msg == None
     _map2 = cont2.maps[0]
-    assert _map2.name == _map.name
-    assert len(_map2.verts) == len(_map.verts)
-    assert len(_map2.linedefs) == len(_map.linedefs)
+    assert _map2.name == e1m1.name
+    assert len(_map2.verts) == len(e1m1.verts)
+    assert len(_map2.linedefs) == len(e1m1.linedefs)
     assert len(_map2.things) == 1
 
     # draw maps for comparison
-    save_map_png( _map, 'expected.png')
+    save_map_png( e1m1, 'expected.png')
     save_map_png( _map2, 'actual.png')
 
 def create_square_map(ref):
