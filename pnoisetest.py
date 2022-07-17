@@ -22,7 +22,7 @@ for (u,_) in G.piter():
     minval = min(minval, val)
     maxval = max(maxval, val)
 
-print minval, maxval
+print(minval, maxval)
 
 G.show_image_scalar(minval, maxval)
 pl.show()
