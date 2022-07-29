@@ -9,9 +9,10 @@ def build_wad( srcwad, destwad ):
     """
     Compile bsp5.2 from source: http://games.moria.org.uk/games/doom/bsp/
     TLDR: ./configure && make
-    then bsp binary is in the bsp5.2 folder.
+    then bsp binary is bsp-5.2/bsp
     """
-    sp.check_call(['/Users/stevenan/Downloads/bsp-5.2/bsp',
+    sp.check_call([
+        os.path.join(os.path.dirname(__file__), 'bsp-5.2', 'bsp'),
         srcwad,
         '-o',  destwad])
     print(f'OK built wad into {destwad}')

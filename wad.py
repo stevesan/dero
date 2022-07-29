@@ -305,18 +305,18 @@ class DummyLump():
     def write(s, io): pass
 
 def get_color_for_thing(thing_type):
+    if thing_type not in THING_TABLE:
+        print(f'WARNING: unknown thing type {thing_type}')
+        return None
     type_desc = THING_TABLE[thing_type].lower()
     if 'player' in type_desc and 'start' in type_desc:
         return 'g'
     if 'key' in type_desc:
         if 'blue' in type_desc:
-            print(type_desc)
             return 'b'
         elif 'red' in type_desc:
-            print(type_desc)
             return 'r'
         elif 'yellow' in type_desc:
-            print(type_desc)
             return 'y'
     else:
         return None
