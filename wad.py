@@ -6,6 +6,7 @@ import random
 import utils
 import dero_config
 from wad_thing_table import *
+import re
 
 
 COLOR_TO_LINEDEF_FUNC = {
@@ -72,7 +73,7 @@ class WADFile:
             block.write(s)
 
     def is_map_start_lump(s, name):
-        return name.startswith('MAP') or (name[0] == 'E' and name[2] == 'M')
+        return re.fullmatch(r'MAP\d\d', name) or re.fullmatch(r'E\dM\d', name)
 
 
 class SimpleStruct:
@@ -503,7 +504,7 @@ class WADContent:
             name = entry.name
 
             if wad.is_map_start_lump(name):
-                assert entry.size == 0
+                assert entry.size == 0, name
                 print('reading map ' + entry.name)
                 mapp = Map(entry.name)
                 s.maps += [mapp]
