@@ -21,6 +21,9 @@ COLOR_TO_KEY_THING_TYPE = {
     'Y' : 6,
 }
 
+def is_map_start_lump(name):
+    return re.fullmatch(r'MAP\d\d', name) or re.fullmatch(r'E\dM\d', name)
+
 class WADFile:
     """ Low-level operations for read/writing lumps, for reading and writing wads """
 
@@ -73,8 +76,7 @@ class WADFile:
             block.write(s)
 
     def is_map_start_lump(s, name):
-        return re.fullmatch(r'MAP\d\d', name) or re.fullmatch(r'E\dM\d', name)
-
+        return is_map_start_lump(name)
 
 class SimpleStruct:
 
@@ -521,6 +523,27 @@ class WADContent:
             else:
                 # ignore this lump
                 pass
+
+def enum_map_names(path):
+    """ This will yield (lumpinfo, wadfile) tuples for each lump """
+    with open(path, 'rb') as f:
+        wad = WADFile(f)
+
+        header = f.read(4).decode('ascii')
+        num_lumps = wad.read_long()
+        dir_offset = wad.read_long()
+
+        assert header == 'IWAD' or header == 'PWAD', header
+
+        # read directory
+        f.seek(dir_offset)
+        infosize = LumpInfo().get_size()
+        end = f.tell() + num_lumps * infosize
+        directory = wad.read_array_lump(end, LumpInfo)
+
+        for entry in directory:
+            if is_map_start_lump(entry.name):
+                yield entry.name
 
 def load(path):
     """ This will yield (lumpinfo, wadfile) tuples for each lump """
