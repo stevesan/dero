@@ -15,6 +15,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--pwad', type=str, default=None, help='Path to the PWAD to play')
 parser.add_argument('--nomons', action='store_true', default=False)
 parser.add_argument('--voxels', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument('--map', type=str, default=None)
+parser.add_argument('--savegame', type=str, default=None)
 args = parser.parse_args()
 
 def main():
@@ -48,7 +50,9 @@ def main():
       '-shotdir', pwad_dir,
       ]
 
-  if args.nomons: call_args += ['-nomonsters']
+  if args.nomons: call_args.append('-nomonsters')
+  if args.map: call_args += ['+map', args.map, '+skill', '1']
+  if args.savegame: call_args += ['-loadgame', args.savegame]
 
   print('final args:', call_args)
   subprocess.check_call(call_args)
