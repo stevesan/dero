@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 """
 Creates a json file listing all found wads and information about them.
