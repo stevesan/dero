@@ -1,6 +1,6 @@
 import sys
 import struct
-import pylab
+import matplotlib.pyplot as pyplt
 from queue import * 
 import random
 import utils
@@ -389,7 +389,7 @@ class Map:
         for t in s.things:
             color = get_color_for_thing(t.type)
             if color:
-                pylab.plot([t.x], [t.y], '.', color=color)
+                pyplt.plot([t.x], [t.y], '.', color=color)
 
         color2lds = {}
         for ld in s.linedefs:
@@ -407,7 +407,7 @@ class Map:
                 p1 = s.verts[ld.vert1]
                 xx += [p0.x, p1.x, nan]
                 yy += [p0.y, p1.y, nan]
-            pylab.plot( xx, yy, '-', color=color, linewidth=0.5)
+            pyplt.plot( xx, yy, '-', color=color, linewidth=0.5)
 
         # make it square
         xx = [v.x for v in s.verts]
@@ -421,8 +421,8 @@ class Map:
         right = cx + L/2.0/height_over_width
         top = cy + L/2.0
         bot = cy - L/2.0
-        pylab.xlim([ left, right ])
-        pylab.ylim([ bot, top ])
+        pyplt.xlim([ left, right ])
+        pyplt.ylim([ bot, top ])
 
         print('done')
 
@@ -611,11 +611,11 @@ def save_map_png(mapp, fname):
 def save_map_png_partial(mapp, fname, linechance):
     w_inches = 10
     h_inches = 8
-    pylab.figure(figsize=(w_inches, h_inches))
+    pyplt.figure(figsize=(w_inches, h_inches))
     mapp.plot_partial(h_inches/w_inches, linechance)
-    pylab.savefig(fname, dpi=512)
+    pyplt.savefig(fname, dpi=512)
     print('done plotting to %s' % fname)
-    pylab.close()
+    pyplt.close()
 
 def test_dump_doom1_pngs():
     path = dero_config.DOOM1_WAD_PATH
