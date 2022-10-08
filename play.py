@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/python3
+#!/usr/bin/env python3
 
 """
 Given a WAD, it'll detect if it's for DOOM1 or 2 (based on map names) and
@@ -12,7 +12,7 @@ import subprocess
 import dero_config
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--pwad', type=str, default=None, help='Path to the PWAD to play')
+parser.add_argument('--pwad', type=str, required=True, help='Path to the PWAD to play')
 parser.add_argument('--nomons', action='store_true', default=False)
 parser.add_argument('--voxels', action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument('--map', type=str, default=None)
